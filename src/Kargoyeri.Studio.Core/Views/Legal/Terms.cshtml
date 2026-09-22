@@ -1,0 +1,53 @@
+@{
+    ViewData["Title"] = "Kullanim Sartlari";
+    Layout = "_LegalLayout";
+}
+
+<h1>Kullanim Sartlari</h1>
+<p class="lead">Son guncelleme: @DateTime.UtcNow.ToString("dd.MM.yyyy")</p>
+
+<h2>1. Hizmet Tanimi</h2>
+<p>
+    Kargoyeri Studio, e-ticaret ve operasyon sistemlerinin kargo firmalari ile entegrasyonunu
+    saglayan bir SaaS platformudur. Gonderi olusturma, takip, iptal, raporlama islevleri sunar.
+</p>
+
+<h2>2. Hesap Sorumlulugu</h2>
+<p>
+    Hesabinizin (kullanici adi, sifre, API anahtari) gizliligi sizin sorumlulugunuzdadir.
+    Yetkisiz kullanim sezilirse derhal <a href="mailto:destek@kargoyeri.com">destek</a> ile
+    iletisime gecin.
+</p>
+
+<h2>3. Yasak Kullanimlar</h2>
+<ul>
+    <li>Spam / kotuye kullanim (toplu sahte gonderi, sistemi yanlis bilgilerle besleme).</li>
+    <li>Dolandiricilik amaciyla kapida odeme tahsilati.</li>
+    <li>Sistemin teknik sinirlarini asma denemeleri (yogun rate-limit ihlali, otomatik scrape).</li>
+    <li>Baska bir tenant'a ait verilere ulasma denemeleri.</li>
+</ul>
+
+<h2>4. Hizmet Seviyesi (SLA)</h2>
+<p>
+    Platform <strong>%99.5 yillik uptime</strong> hedeflenir. Bakim pencereleri 24 saat once duyurulur.
+    Ucretli planlar icin spesifik SLA sozlesmesi ayrica imzalanir.
+</p>
+
+<h2>5. Sorumluluk Siniri</h2>
+<p>
+    Kargoyeri Studio, kargo firmasinin teslimat performansindan, gonderiyi kaybetmesinden veya
+    geciktirmesinden sorumlu degildir. Bu konularda dogrudan kargo firmasi muhattabinizdir.
+</p>
+
+<h2>6. Sozlesme Sonlandirma</h2>
+<p>
+    Hesabinizi istediginiz zaman kapatabilirsiniz. Veri silme prosedurleri icin
+    <a href="@Url.Action("Privacy")">Aydinlatma Metni</a> ve
+    <a href="@Url.Action("DataDeletion")">Veri Silme Talebi</a> sayfalarina bakin.
+</p>
+
+<h2>7. Anlasmazliklar</h2>
+<p>
+    Bu sartlardan dogan anlasmazliklar Turkiye Cumhuriyeti yasalarina tabidir;
+    Istanbul mahkemeleri yetkilidir.
+</p>

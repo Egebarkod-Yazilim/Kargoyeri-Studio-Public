@@ -1,0 +1,97 @@
+# ==========================================================================
+# Kargoyeri.Studio — Production docker-compose
+# --------------------------------------------------------------------------
+# Build context = bu repo'nun BIR UST dizini (Projeler/ ile kardes oldugu icin)
+# Calistirma:
+#   cd .. ; docker compose -f Kargoyeri.Studio/docker-compose.yml up -d --build
+#
+# Veya bu klasorden:
+#   docker compose up -d --build
+# (context: ".." sayesinde parent dizini context olur)
+# ==========================================================================
+
+services:
+  studio:
+    build:
+      context: ..
+      dockerfile: Kargoyeri.Studio/Dockerfile
+    image: kargoyeri-studio:latest
+    container_name: kargoyeri-studio
+    restart: unless-stopped
+    expose:
+      - "8080"            # Sadece compose ag dahili — disariya nginx aciyor
+    volumes:
+      - studio-data:/app/data
+      - studio-keys:/app/data-protection-keys
+      - studio-logs:/app/logs
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Storage__BasePath=/app/data
+      # === ZORUNLU: production guard'lari karsilamak icin ===
+      # - StudioAccess__AdminAccessCode=GUCLU-RASTGELE-MIN-12-KARAKTER
+      # - StudioAccess__OperatorAccessCode=BASKA-GUCLU-KOD
+      # === Veritabani (SQL Server) ===
+      # - Storage__Mode=SqlServer
+      # - ConnectionStrings__Kargoyeri=Server=mssql;Database=KargoyeriStudio;User=sa;Password=...;TrustServerCertificate=True
+      # === SMTP (sifre sifirlama / bildirim mailleri) ===
+      # - Smtp__Host=smtp.example.com
+      # - Smtp__Port=587
+      # - Smtp__EnableSsl=true
+      # - Smtp__Username=mailer@example.com
+      # - Smtp__Password=...
+      # - Smtp__FromAddress=mailer@example.com
+      # === Seq (yapilandirilmis log) ===
+      # - Serilog__Seq__ServerUrl=http://seq:5341
+      # - Serilog__Seq__ApiKey=...
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on: []
+    networks:
+      - studio-net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: kargoyeri-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - studio
+    networks:
+      - studio-net
+
+  # === Opsiyonel: Seq logging ===
+  # seq:
+  #   image: datalust/seq:latest
+  #   container_name: kargoyeri-seq
+  #   restart: unless-stopped
+  #   environment:
+  #     - ACCEPT_EULA=Y
+  #     # - SEQ_FIRSTRUN_ADMINPASSWORDHASH=...
+  #   ports:
+  #     - "5341:80"
+  #   volumes:
+  #     - seq-data:/data
+  #   networks:
+  #     - studio-net
+
+volumes:
+  studio-data:
+  studio-keys:
+  studio-logs:
+  nginx-logs:
+  # seq-data:
+
+networks:
+  studio-net:
+    driver: bridge

@@ -1,0 +1,701 @@
+﻿@model TenantSwitchViewModel
+@using Kargoyeri.Studio.Core.Infrastructure
+@using Kargoyeri.Studio.Core.Infrastructure.OrderChannels
+@using Kargoyeri.Contracts.Enums
+@{
+    ViewData["Title"] = "Musteriler";
+    int activeCount  = Model.Tenants.Count(t => t.IsActive);
+    int passiveCount = Model.Tenants.Count(t => !t.IsActive);
+    int licOk        = Model.Tenants.Count(t => t.License.IsValid);
+    int licExp       = Model.Tenants.Count(t => t.License.HasLicense && t.License.IsExpired);
+    var marketplaces = OrderChannelCatalog.All.Where(c => c.Group == "Pazaryeri")
+        .OrderBy(c => c.Stage == OrderChannelStage.Live ? 0 : 1)
+        .ThenBy(c => c.DisplayName).ToList();
+    var extraSources = OrderChannelCatalog.All.Where(c => c.Group != "Pazaryeri")
+        .OrderBy(c => c.Stage == OrderChannelStage.ComingSoon ? 1 : 0).ToList();
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1 style="margin:0;font-size:1.35rem;">Musteriler</h1>
+    </div>
+    <button class="primary-button" onclick="document.getElementById('add-customer-panel').toggleAttribute('hidden')">
+        + Yeni Musteri
+    </button>
+</div>
+
+<div class="metric-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;">
+    <div class="metric-card">
+        <span>@L["Label_Total"]</span>
+        <strong>@Model.Tenants.Count</strong>
+    </div>
+    <div class="metric-card">
+        <span>Aktif</span>
+        <strong style="color:#16a34a;">@activeCount</strong>
+    </div>
+    <div class="metric-card">
+        <span>Pasif</span>
+        <strong style="color:var(--muted);">@passiveCount</strong>
+    </div>
+    <div class="metric-card">
+        <span>Lisans Aktif / Suresi Dolu</span>
+        <strong><span style="color:#16a34a;">@licOk</span> / <span style="color:#dc2626;">@licExp</span></strong>
+    </div>
+</div>
+
+@* â”€â”€ Arama â”€â”€ *@
+<div class="panel-card" style="margin-bottom:16px;">
+    <form asp-action="Index" method="get" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:220px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Musteri Ara</label>
+            <input class="form-input" type="text" name="search" value="@Model.Search" placeholder="Kod, ad, e-posta veya webhook..." />
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button type="submit" class="primary-button">@L["Action_Search"]</button>
+            @if (!string.IsNullOrWhiteSpace(Model.Search))
+            {
+                <a class="ghost-link" asp-action="Index">Temizle</a>
+            }
+        </div>
+    </form>
+</div>
+
+@* ── Yeni Müşteri — Adım Adım Sihirbaz ── *@
+<div id="add-customer-panel" hidden class="panel-card customer-wizard" style="margin-bottom:16px;border-left:3px solid var(--brand);">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+        <div>
+            <p class="eyebrow" style="margin:0;">Yeni Müşteri Ekle</p>
+            <h2 style="margin:4px 0 0;font-size:1.05rem;">Kurulum Sihirbazı</h2>
+        </div>
+        <button type="button" class="ghost-link" onclick="document.getElementById('add-customer-panel').setAttribute('hidden','')">✕ Kapat</button>
+    </div>
+
+    <ol class="cw-steps">
+        <li class="cw-step" data-step="1">
+            <span class="cw-num">1</span>
+            <span class="cw-label">Müşteri Bilgileri</span>
+            <span class="cw-sub">Kod & ad</span>
+        </li>
+        <li class="cw-step" data-step="2">
+            <span class="cw-num">2</span>
+            <span class="cw-label">İletişim</span>
+            <span class="cw-sub">Webhook, e-posta</span>
+        </li>
+        <li class="cw-step" data-step="3">
+            <span class="cw-num">3</span>
+            <span class="cw-label">Pazaryerleri</span>
+            <span class="cw-sub">Sipariş kaynakları</span>
+        </li>
+        <li class="cw-step" data-step="4">
+            <span class="cw-num">4</span>
+            <span class="cw-label">Onay</span>
+            <span class="cw-sub">Özet & oluştur</span>
+        </li>
+    </ol>
+
+    <form asp-action="AddCustomer" method="post" id="customerWizardForm">
+        @Html.AntiForgeryToken()
+
+        <!-- Step 1 -->
+        <div class="cw-pane" data-pane="1">
+            <h3 style="margin:0 0 4px;font-size:.98rem;color:var(--brand);">1 · Müşteri Bilgileri</h3>
+            <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">Sistem içinde benzersiz olacak bir kod ve ticari adı gir.</p>
+            <div class="cw-row">
+                <label class="cw-field">
+                    <span>Müşteri Kodu <em class="req">zorunlu</em></span>
+                    <input asp-for="NewCustomer.TenantKey" class="form-input" placeholder="acme-001" data-required="1" />
+                    <small style="color:var(--muted);font-size:.74rem;">Sadece harf, rakam, tire (-) — örn: acme-001, ferah-tekstil</small>
+                </label>
+                <label class="cw-field">
+                    <span>Müşteri Adı <em class="req">zorunlu</em></span>
+                    <input asp-for="NewCustomer.Name" class="form-input" placeholder="Acme Ticaret A.Ş." data-required="1" />
+                </label>
+            </div>
+            <label class="cw-field">
+                <span>VKN / TCKN <em class="opt">opsiyonel</em></span>
+                <input asp-for="NewCustomer.Vkn" class="form-input" maxlength="11" placeholder="10 haneli VKN veya 11 haneli TCKN" />
+            </label>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="cw-pane" data-pane="2">
+            <h3 style="margin:0 0 4px;font-size:.98rem;color:var(--brand);">2 · İletişim Kanalları</h3>
+            <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">Bildirimler ve callback'ler hangi adreslere gönderilecek?</p>
+            <div class="cw-row">
+                <label class="cw-field">
+                    <span>E-posta <em class="opt">opsiyonel</em></span>
+                    <input asp-for="NewCustomer.Email" class="form-input" type="email" placeholder="info@@firma.com" />
+                </label>
+                <label class="cw-field">
+                    <span>Telefon <em class="opt">opsiyonel</em></span>
+                    <input asp-for="NewCustomer.Phone" class="form-input" type="tel" placeholder="+90 5XX XXX XX XX" />
+                </label>
+            </div>
+            <label class="cw-field">
+                <span>Webhook URL <em class="opt">opsiyonel</em></span>
+                <input asp-for="NewCustomer.WebhookUrl" class="form-input" placeholder="https://acme.com/webhooks/kargoyeri" />
+                <small style="color:var(--muted);font-size:.74rem;">Sipariş/durum güncellemeleri bu adrese POST edilir.</small>
+            </label>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="cw-pane" data-pane="3">
+            <h3 style="margin:0 0 4px;font-size:.98rem;color:var(--brand);">3 · Pazaryerleri & Sipariş Kaynakları</h3>
+            <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">
+                Müşteri hangi kanallardan sipariş çekecek? Karta tıklayarak seç. Bu adımı atlayabilirsin — kanallar sonradan da eklenebilir.
+            </p>
+
+            <h4 style="font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 6px;">Pazaryerleri</h4>
+            <div class="cw-mp-grid">
+                @foreach (var mp in marketplaces)
+                {
+                    var stageClass = mp.Stage == OrderChannelStage.Live ? "live" : (mp.Stage == OrderChannelStage.Simulation ? "sim" : "soon");
+                    var stageLabel = mp.Stage == OrderChannelStage.Live ? "Canlı" : (mp.Stage == OrderChannelStage.Simulation ? "Sim" : "Yakında");
+                    <label class="cw-mp-card @stageClass">
+                        <input type="checkbox" name="NewCustomer.SelectedChannels" value="@mp.Code" />
+                        <span class="cw-mp-stage">@stageLabel</span>
+                        <div class="cw-mp-name">@mp.DisplayName</div>
+                        <div class="cw-mp-tag">@mp.Tagline</div>
+                    </label>
+                }
+            </div>
+
+            @if (extraSources.Any())
+            {
+                <h4 style="font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:14px 0 6px;">Diğer Kaynaklar</h4>
+                <div class="cw-mp-grid">
+                    @foreach (var src in extraSources)
+                    {
+                        var stageClass = src.Stage == OrderChannelStage.Live ? "live" : (src.Stage == OrderChannelStage.Simulation ? "sim" : "soon");
+                        var stageLabel = src.Stage == OrderChannelStage.Live ? "Canlı" : (src.Stage == OrderChannelStage.Simulation ? "Sim" : "Yakında");
+                        var isSoon = src.Stage == OrderChannelStage.ComingSoon;
+                        <label class="cw-mp-card @stageClass @(isSoon ? "disabled" : "")">
+                            <input type="checkbox" name="NewCustomer.SelectedExtraSources" value="@src.Code" @(isSoon ? "disabled" : "") />
+                            <span class="cw-mp-stage">@stageLabel</span>
+                            <div class="cw-mp-name">@src.DisplayName</div>
+                            <div class="cw-mp-tag">@src.Tagline</div>
+                        </label>
+                    }
+                </div>
+            }
+            <p style="font-size:.78rem;color:var(--muted);margin-top:10px;">
+                💡 API anahtarları burada girilmez. Müşteri oluştuktan sonra her pazaryeri için ayrı 4 adımlı kurulum sihirbazı çalışır.
+            </p>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="cw-pane" data-pane="4">
+            <h3 style="margin:0 0 4px;font-size:.98rem;color:var(--brand);">4 · Özet & Oluştur</h3>
+            <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px;">Bilgileri kontrol et, ardından müşteri kaydını oluştur.</p>
+
+            <dl class="cw-summary">
+                <dt>Müşteri Kodu</dt><dd id="cwSumKey">—</dd>
+                <dt>Müşteri Adı</dt><dd id="cwSumName">—</dd>
+                <dt>VKN/TCKN</dt><dd id="cwSumVkn">—</dd>
+                <dt>E-posta / Telefon</dt><dd id="cwSumContact">—</dd>
+                <dt>Webhook</dt><dd id="cwSumWebhook">—</dd>
+                <dt>Kanallar</dt><dd id="cwSumChannels">—</dd>
+            </dl>
+        </div>
+
+        <!-- Footer -->
+        <div class="cw-footer">
+            <button type="button" class="ghost-link" id="cwPrev">&larr; Geri</button>
+            <span class="cw-progress" id="cwProgress">Adım 1 / 4</span>
+            <button type="button" class="primary-button" id="cwNext">İleri &rarr;</button>
+            <button type="submit" class="primary-button" id="cwSubmit" style="display:none;">✓ Müşteriyi Oluştur</button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .customer-wizard .cw-steps {
+        list-style:none; padding:0; margin:0 0 18px;
+        display:grid; grid-template-columns: repeat(4,1fr); gap:6px;
+    }
+    .customer-wizard .cw-step {
+        position:relative; padding:10px 12px; border-radius:8px;
+        background: rgba(125,141,184,.06); border:1px solid rgba(125,141,184,.18);
+        display:flex; flex-direction:column; gap:2px;
+        transition: all .2s ease;
+    }
+    .customer-wizard .cw-step::after {
+        content:""; position:absolute; right:-6px; top:50%;
+        width:0; height:0; border:6px solid transparent;
+        border-left-color: rgba(125,141,184,.18);
+        transform: translateY(-50%);
+    }
+    .customer-wizard .cw-step:last-child::after { display:none; }
+    .customer-wizard .cw-num {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:24px; height:24px; border-radius:50%;
+        background: rgba(125,141,184,.2); color:var(--muted);
+        font-weight:700; font-size:.8rem;
+    }
+    .customer-wizard .cw-label { font-weight:600; font-size:.86rem; margin-top:4px; color:var(--text); }
+    .customer-wizard .cw-sub { font-size:.72rem; color:var(--muted); }
+    .customer-wizard .cw-step.is-active {
+        background: linear-gradient(135deg, rgba(232,164,90,.14), rgba(232,164,90,.04));
+        border-color: rgba(232,164,90,.5);
+        box-shadow: 0 2px 10px rgba(232,164,90,.18);
+    }
+    .customer-wizard .cw-step.is-active .cw-num { background:#e8a45a; color:#fff; }
+    .customer-wizard .cw-step.is-done {
+        background: rgba(39,174,96,.08); border-color: rgba(39,174,96,.35); cursor:pointer;
+    }
+    .customer-wizard .cw-step.is-done .cw-num { background:#27ae60; color:#fff; font-size:0; }
+    .customer-wizard .cw-step.is-done .cw-num::before { content:"✓"; font-size:.85rem; font-weight:700; }
+
+    .customer-wizard .cw-pane { display:none; min-height:200px; padding:6px 0; }
+    .customer-wizard .cw-pane.is-active { display:block; animation: cwSlide .25s ease; }
+    @@keyframes cwSlide {
+        from { opacity:0; transform: translateY(6px); }
+        to   { opacity:1; transform: none; }
+    }
+    .customer-wizard .cw-row {
+        display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:10px;
+    }
+    .customer-wizard .cw-field { display:block; margin-bottom:12px; }
+    .customer-wizard .cw-field > span {
+        display:block; font-size:.78rem; font-weight:600; color:var(--muted);
+        text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px;
+    }
+    .customer-wizard .cw-field .req { font-style:normal;color:#e8a45a;font-size:.68rem;margin-left:4px; }
+    .customer-wizard .cw-field .opt { font-style:normal;color:var(--muted);font-size:.68rem;margin-left:4px; }
+
+    .customer-wizard .cw-mp-grid {
+        display:grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap:10px;
+    }
+    .customer-wizard .cw-mp-card {
+        display:block; padding:12px 12px 14px; border:2px solid var(--border); border-radius:10px;
+        background:var(--card-bg, #fff); cursor:pointer; position:relative;
+        transition: all .15s ease;
+    }
+    .customer-wizard .cw-mp-card:hover { border-color:#86efac; transform: translateY(-1px); }
+    .customer-wizard .cw-mp-card input { position:absolute; opacity:0; pointer-events:none; }
+    .customer-wizard .cw-mp-name { font-weight:700; font-size:.9rem; }
+    .customer-wizard .cw-mp-tag { font-size:.74rem; color:var(--muted); margin-top:2px; line-height:1.3; }
+    .customer-wizard .cw-mp-stage {
+        position:absolute; top:8px; right:8px;
+        font-size:.66rem; font-weight:600; padding:2px 6px; border-radius:8px;
+        background: rgba(125,141,184,.12); color:var(--muted);
+    }
+    .customer-wizard .cw-mp-card.live  .cw-mp-stage { background:rgba(39,174,96,.14); color:#16a34a; }
+    .customer-wizard .cw-mp-card.sim   .cw-mp-stage { background:rgba(212,160,23,.14); color:#d97706; }
+    .customer-wizard .cw-mp-card.soon  .cw-mp-stage { background:rgba(99,102,241,.14); color:#6366f1; }
+    .customer-wizard .cw-mp-card.is-checked {
+        border-color:#16a34a; background:rgba(39,174,96,.06);
+        box-shadow:0 4px 14px rgba(22,163,74,.18);
+    }
+    .customer-wizard .cw-mp-card.is-checked::after {
+        content:"✓"; position:absolute; bottom:8px; right:10px;
+        color:#16a34a; font-weight:800; font-size:1rem;
+    }
+    .customer-wizard .cw-mp-card.disabled { opacity:.55; cursor:not-allowed; }
+    .customer-wizard .cw-mp-card.disabled:hover { transform:none; border-color:var(--border); }
+
+    .customer-wizard .cw-summary {
+        background: rgba(125,141,184,.05); border:1px solid var(--border);
+        border-radius:10px; padding:14px 18px; margin:0;
+        display:grid; grid-template-columns: 180px 1fr; gap:6px 14px;
+    }
+    .customer-wizard .cw-summary dt {
+        font-size:.74rem; color:var(--muted); text-transform:uppercase;
+        letter-spacing:.04em; align-self:center;
+    }
+    .customer-wizard .cw-summary dd { margin:0; font-weight:600; align-self:center; }
+
+    .customer-wizard .cw-footer {
+        display:flex; align-items:center; justify-content:space-between;
+        margin-top:18px; padding-top:14px; border-top:1px solid var(--border); gap:12px;
+    }
+    .customer-wizard .cw-progress { font-size:.85rem; color:var(--muted); }
+
+    @@media (max-width: 720px) {
+        .customer-wizard .cw-row { grid-template-columns: 1fr; }
+        .customer-wizard .cw-summary { grid-template-columns: 1fr; }
+        .customer-wizard .cw-summary dt { margin-top:6px; }
+    }
+</style>
+
+<script>
+(function () {
+    const root = document.getElementById('add-customer-panel');
+    if (!root) return;
+    const TOTAL = 4;
+    let current = 1;
+
+    const steps = root.querySelectorAll('.cw-step');
+    const panes = root.querySelectorAll('.cw-pane');
+    const btnPrev = document.getElementById('cwPrev');
+    const btnNext = document.getElementById('cwNext');
+    const btnSubmit = document.getElementById('cwSubmit');
+    const progress = document.getElementById('cwProgress');
+
+    function render() {
+        steps.forEach(el => {
+            const n = parseInt(el.getAttribute('data-step'), 10);
+            el.classList.remove('is-active','is-done');
+            if (n < current) el.classList.add('is-done');
+            else if (n === current) el.classList.add('is-active');
+        });
+        panes.forEach(p => {
+            p.classList.toggle('is-active', parseInt(p.getAttribute('data-pane'),10) === current);
+        });
+        btnPrev.style.visibility = current === 1 ? 'hidden' : 'visible';
+        const last = current === TOTAL;
+        btnNext.style.display = last ? 'none' : '';
+        btnSubmit.style.display = last ? '' : 'none';
+        progress.textContent = `Adım ${current} / ${TOTAL}`;
+        if (last) refreshSummary();
+    }
+
+    function validateStep(n) {
+        const pane = root.querySelector(`.cw-pane[data-pane="${n}"]`);
+        if (!pane) return true;
+        let ok = true;
+        pane.querySelectorAll('input[data-required="1"]').forEach(inp => {
+            const v = (inp.value || '').trim();
+            if (!v) { inp.style.borderColor='#dc2626'; ok = false; }
+            else inp.style.borderColor = '';
+        });
+        return ok;
+    }
+
+    function val(name) {
+        const el = root.querySelector(`[name="NewCustomer.${name}"]`);
+        return el ? (el.value || '').trim() : '';
+    }
+    function refreshSummary() {
+        document.getElementById('cwSumKey').textContent = val('TenantKey') || '—';
+        document.getElementById('cwSumName').textContent = val('Name') || '—';
+        document.getElementById('cwSumVkn').textContent = val('Vkn') || '—';
+        const em = val('Email'), ph = val('Phone');
+        document.getElementById('cwSumContact').textContent = [em,ph].filter(Boolean).join(' · ') || '—';
+        document.getElementById('cwSumWebhook').textContent = val('WebhookUrl') || '—';
+        const checked = root.querySelectorAll('input[name="NewCustomer.SelectedChannels"]:checked, input[name="NewCustomer.SelectedExtraSources"]:checked');
+        const labels = Array.from(checked).map(c => c.closest('.cw-mp-card')?.querySelector('.cw-mp-name')?.textContent.trim()).filter(Boolean);
+        document.getElementById('cwSumChannels').textContent = labels.length ? labels.join(', ') : 'Seçim yok';
+    }
+
+    btnNext.addEventListener('click', () => {
+        if (!validateStep(current)) return;
+        if (current < TOTAL) { current++; render(); }
+    });
+    btnPrev.addEventListener('click', () => { if (current > 1) { current--; render(); } });
+
+    root.querySelectorAll('label.cw-mp-card').forEach(card => {
+        const cb = card.querySelector('input[type=checkbox]');
+        if (!cb || cb.disabled) return;
+        cb.addEventListener('change', () => card.classList.toggle('is-checked', cb.checked));
+    });
+    steps.forEach(el => {
+        el.addEventListener('click', () => {
+            const n = parseInt(el.getAttribute('data-step'),10);
+            if (n < current) { current = n; render(); }
+        });
+    });
+
+    render();
+})();
+</script>
+
+@if (!Model.Tenants.Any())
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">&#128101;</div>
+        <h2>@(string.IsNullOrWhiteSpace(Model.Search) ? "Henuz musteri yok" : "Eslesen musteri bulunamadi")</h2>
+        <p>@(string.IsNullOrWhiteSpace(Model.Search) ? "Yukardaki \"Yeni Musteri\" butonundan ilk musteriyi ekleyin." : "Arama kriterini degistirip tekrar deneyin.")</p>
+    </div>
+}
+else
+{
+    <div class="table-shell">
+        <table class="studio-table">
+            <thead>
+                <tr>
+                    <th>Musteri</th>
+                    <th>Kod</th>
+                    <th>Bildirim</th>
+                    <th style="text-align:center;">Kullanici</th>
+                    <th style="text-align:center;">Lisans</th>
+                    <th style="text-align:center;">@L["Label_Status"]</th>
+                    <th style="text-align:right;">Son Guncelleme</th>
+                    <th style="text-align:right;min-width:200px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model.Tenants)
+                {
+                    var lic = t.License;
+                    <tr style="@(t.IsCurrent ? "background:rgba(22,163,74,.05);" : "")">
+                        <td style="font-weight:@(t.IsCurrent ? "700" : "500");">
+                            @t.Name
+                            @if (t.IsCurrent)
+                            {
+                                <span class="cap-tag" style="font-size:.7rem;margin-left:6px;">Aktif Oturum</span>
+                            }
+                        </td>
+                        <td style="font-family:monospace;font-size:.82rem;color:var(--muted);">@t.TenantKey</td>
+                        <td style="font-size:.8rem;">
+                            @if (!string.IsNullOrWhiteSpace(t.WebhookAddress))
+                            {
+                                <div style="color:var(--muted);" title="@t.WebhookAddress">
+                                    <span class="cap-tag" style="font-size:.7rem;margin-right:4px;">WH</span>
+                                    @(t.WebhookAddress.Length > 25 ? t.WebhookAddress[..25] + "â€¦" : t.WebhookAddress)
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.EmailAddress))
+                            {
+                                <div style="color:var(--muted);margin-top:3px;">
+                                    <span class="cap-tag" style="font-size:.7rem;margin-right:4px;">E</span>
+                                    @t.EmailAddress
+                                </div>
+                            }
+                            @if (string.IsNullOrWhiteSpace(t.WebhookAddress) && string.IsNullOrWhiteSpace(t.EmailAddress))
+                            {
+                                <span style="color:var(--muted);font-size:.8rem;">â€”</span>
+                            }
+                        </td>
+                        <td style="text-align:center;color:var(--muted);font-size:.85rem;">
+                            @t.UserCount
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="status-pill @lic.StatusCss" style="font-size:.72rem;">@lic.StatusLabel</span>
+                            @if (lic.HasLicense)
+                            {
+                                <div style="font-size:.72rem;color:var(--muted);margin-top:3px;">
+                                    @if (lic.IsExpired)
+                                    {
+                                        <span style="color:#dc2626;">Suresi doldu</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@lic.DaysRemaining gun kaldi</span>
+                                    }
+                                </div>
+                                <div style="font-size:.68rem;font-family:monospace;color:var(--muted);margin-top:2px;">
+                                    @lic.Code
+                                </div>
+                            }
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="status-pill @(t.IsActive ? "status-pill--ready" : "status-pill--pending")" style="font-size:.72rem;">
+                                @(t.IsActive ? "Aktif" : "Pasif")
+                            </span>
+                        </td>
+                        <td style="text-align:right;font-size:.78rem;color:var(--muted);">
+                            @(t.UpdatedAtUtc.HasValue ? t.UpdatedAtUtc.Value.ToLocalTime().ToString("dd.MM.yy HH:mm") : "â€”")
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
+                                @if (!t.IsCurrent)
+                                {
+                                    <form asp-action="Switch" method="post" style="display:inline;margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                        <button class="primary-button" type="submit" style="font-size:.75rem;padding:5px 10px;">Gec</button>
+                                    </form>
+                                }
+                                <button class="secondary-button" type="button" style="font-size:.75rem;padding:5px 10px;"
+                                        onclick="togglePanel('lic-@t.TenantKey')">Lisans</button>
+                                <button class="secondary-button" type="button" style="font-size:.75rem;padding:5px 10px;"
+                                        onclick="togglePanel('usr-@t.TenantKey')">Kullanicilar</button>
+                                <button class="secondary-button" type="button" style="font-size:.75rem;padding:5px 10px;"
+                                        onclick="togglePanel('prv-@t.TenantKey')">Yetkiler</button>
+                                <form asp-action="RotateInboundSecret" method="post" style="display:inline;margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                    <button type="submit" class="secondary-button" style="font-size:.75rem;padding:5px 10px;"
+                                            title="Kargo firmalarindan gelen callback'lerde dogrulama icin shared secret"
+                                            onclick="return confirm('Inbound webhook secret yenilensin mi? Eski secret artik calismayacak.')">
+                                        Inbound Secret
+                                    </button>
+                                </form>
+                                <form asp-action="ToggleActive" method="post" style="display:inline;margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                    <button type="submit" class="secondary-button" style="font-size:.75rem;padding:5px 10px;"
+                                            onclick="return confirm('@(t.IsActive ? "Pasife almak istiyor musunuz?" : "Aktif etmek istiyor musunuz?")')">
+                                        @(t.IsActive ? "Pasife Al" : "Aktif Et")
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+
+                    @* â”€â”€ Lisans Paneli â”€â”€ *@
+                    <tr id="lic-@t.TenantKey" style="display:none;">
+                        <td colspan="8" style="padding:0;">
+                            <div class="panel-card" style="margin:8px 16px;border-left:3px solid var(--brand);">
+                                <p class="eyebrow" style="margin-bottom:12px;">Lisans Yonet â€” @t.Name</p>
+                                @if (lic.HasLicense)
+                                {
+                                    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;font-size:.85rem;">
+                                        <div><span style="color:var(--muted);">Kod:</span> <strong style="font-family:monospace;">@lic.Code</strong></div>
+                                        <div><span style="color:var(--muted);">Plan:</span> <strong>@lic.Plan</strong></div>
+                                        <div><span style="color:var(--muted);">Bitis:</span> <strong>@(lic.ExpiresAt?.ToLocalTime().ToString("dd.MM.yyyy") ?? "â€”")</strong></div>
+                                        <div><span style="color:var(--muted);">Durum:</span> <span class="status-pill @lic.StatusCss" style="font-size:.72rem;">@lic.StatusLabel</span></div>
+                                    </div>
+                                }
+                                <form asp-action="SetLicense" method="post" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="TenantKey" value="@t.TenantKey" />
+                                    <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px;">
+                                        <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Erisim Kodu (bos=otomatik)</label>
+                                        <input class="form-input" name="LicenseCode" value="@lic.Code" placeholder="KY-XXXX-XXXX-XXXX" />
+                                    </div>
+                                    <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+                                        <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Bitis Tarihi</label>
+                                        <input class="form-input" type="date" name="ExpiresAt"
+                                               value="@(lic.ExpiresAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? DateTime.Today.AddMonths(1).ToString("yyyy-MM-dd"))" />
+                                    </div>
+                                    <div style="display:flex;flex-direction:column;gap:5px;min-width:120px;">
+                                        <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Plan</label>
+                                        <select class="form-input" name="Plan">
+                                            <option value="monthly" selected="@(lic.Plan == "monthly" ? "selected" : null)">Aylik</option>
+                                            <option value="yearly"  selected="@(lic.Plan == "yearly"  ? "selected" : null)">Yillik</option>
+                                            <option value="custom"  selected="@(lic.Plan == "custom"  ? "selected" : null)">Ozel</option>
+                                        </select>
+                                    </div>
+                                    <div style="display:flex;gap:8px;">
+                                        <button type="submit" class="primary-button" style="font-size:.82rem;">Kaydet</button>
+                                        @if (lic.HasLicense)
+                                        {
+                                            <form asp-action="RotateLicense" method="post" style="display:inline;margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                                <button type="submit" class="secondary-button" style="font-size:.82rem;"
+                                                        onclick="return confirm('Lisans kodu yenilensin mi? Eski kod gecersiz olacak.')">Kodu Yenile</button>
+                                            </form>
+                                            <form asp-action="RevokeLicense" method="post" style="display:inline;margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                                <button type="submit" class="secondary-button" style="font-size:.82rem;color:#dc2626;border-color:#dc2626;"
+                                                        onclick="return confirm('Lisansi iptal etmek istiyor musunuz?')">İptal</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+
+                    @* â”€â”€ KullanÄ±cÄ± Paneli â”€â”€ *@
+                    <tr id="usr-@t.TenantKey" style="display:none;">
+                        <td colspan="8" style="padding:0;">
+                            <div class="panel-card" style="margin:8px 16px;border-left:3px solid #6366f1;">
+                                <p class="eyebrow" style="margin-bottom:12px;">Kullanicilar â€” @t.Name</p>
+                                <div id="usr-list-@t.TenantKey">
+                                    <p style="font-size:.85rem;color:var(--muted);">Yukleniyor...</p>
+                                </div>
+                                <details style="margin-top:12px;">
+                                    <summary style="font-size:.82rem;font-weight:600;cursor:pointer;color:var(--brand);">+ Yeni Kullanici Ekle</summary>
+                                    <form asp-controller="TenantSwitch" asp-action="AddUser" method="post"
+                                          style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:12px;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+                                            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Kullanici Adi</label>
+                                            <input class="form-input" name="username" placeholder="ali.veli" />
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;gap:5px;min-width:160px;">
+                                            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Goruntulenen Ad</label>
+                                            <input class="form-input" name="displayName" placeholder="Ali Veli" />
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+                                            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Sifre</label>
+                                            <input class="form-input" type="password" name="password" />
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;gap:5px;min-width:130px;">
+                                            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Rol</label>
+                                            <select class="form-input" name="role">
+                                                @foreach (var r in TenantUserRoles.All)
+                                                {
+                                                    <option value="@r" selected="@(r == TenantUserRoles.Operator)">@r</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;gap:5px;min-width:200px;">
+                                            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">E-posta (opsiyonel)</label>
+                                            <input class="form-input" type="email" name="email" placeholder="kullanici@firma.com" />
+                                        </div>
+                                        <button type="submit" class="primary-button" style="font-size:.82rem;">Ekle</button>
+                                    </form>
+                                </details>
+                            </div>
+                        </td>
+                    </tr>
+
+                    @* â”€â”€ Kargo Firma Yetkileri â”€â”€ *@
+                    <tr id="prv-@t.TenantKey" style="display:none;">
+                        <td colspan="8" style="padding:0;">
+                            <div class="panel-card" style="margin:8px 16px;border-left:3px solid #f59e0b;">
+                                <p class="eyebrow" style="margin-bottom:12px;">Kargo Firma Yetkileri â€” @t.Name</p>
+                                <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px;">
+                                    Bu musterinin hangi kargo firmalarini kullanabilecegini secin.
+                                    Secilmeyen firmalar musterinin ekranlarinda gorunmeyecek.
+                                </p>
+                                <form asp-action="SetAllowedProviders" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tenantKey" value="@t.TenantKey" />
+                                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+                                        @foreach (var prov in Enum.GetValues<CargoProviderTypeDto>())
+                                        {
+                                            var isChecked = t.AllowedProviders.Contains(prov);
+                                            var inputId = $"prv-{t.TenantKey}-{prov}";
+                                            <label for="@inputId" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem;background:@(isChecked ? "rgba(245,158,11,.08)" : "transparent");">
+                                                @if (isChecked)
+                                                {
+                                                    <input type="checkbox" id="@inputId" name="providers" value="@prov" checked="checked" />
+                                                }
+                                                else
+                                                {
+                                                    <input type="checkbox" id="@inputId" name="providers" value="@prov" />
+                                                }
+                                                <span>@prov</span>
+                                            </label>
+                                        }
+                                    </div>
+                                    <div style="display:flex;gap:10px;align-items:center;">
+                                        <button type="submit" class="primary-button" style="font-size:.82rem;">Kaydet</button>
+                                        <span style="font-size:.78rem;color:var(--muted);">
+                                            Su an: <strong>@t.AllowedProviders.Count</strong> firma yetkili
+                                        </span>
+                                    </div>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+<script>
+function togglePanel(id) {
+    var row = document.getElementById(id);
+    if (!row) return;
+    var isHidden = row.style.display === 'none' || row.style.display === '';
+    row.style.display = isHidden ? 'table-row' : 'none';
+
+    // KullanÄ±cÄ± paneli aÃ§Ä±ldÄ±ysa kullanÄ±cÄ±larÄ± yÃ¼kle
+    if (isHidden && id.startsWith('usr-')) {
+        var tenantKey = id.replace('usr-', '');
+        loadUsers(tenantKey);
+    }
+}
+
+function loadUsers(tenantKey) {
+    var listEl = document.getElementById('usr-list-' + tenantKey);
+    if (!listEl) return;
+    fetch('/TenantSwitch/UserList?tenantKey=' + encodeURIComponent(tenantKey))
+        .then(function(r) { return r.text(); })
+        .then(function(html) { listEl.innerHTML = html; })
+        .catch(function() { listEl.innerHTML = '<p style="color:#dc2626;font-size:.85rem;">Yuklenemedi.</p>'; });
+}
+</script>
+}

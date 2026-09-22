@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Kargoyeri.Worker</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Kargoyeri.Application\Kargoyeri.Application.csproj" />
+    <ProjectReference Include="..\Kargoyeri.Infrastructure\Kargoyeri.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

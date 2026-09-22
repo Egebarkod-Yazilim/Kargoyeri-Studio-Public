@@ -1,0 +1,122 @@
+@model RoadmapViewModel
+@{
+    ViewData["Title"] = "Roadmap";
+}
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Mimari Yol Haritasi</p>
+        <h1>Urunu nasil buyutuyoruz?</h1>
+    </div>
+</section>
+
+<section class="hero-panel hero-panel--roadmap">
+    <div>
+        <p class="eyebrow">Mevcut Odak</p>
+        <h2>@Model.CurrentFocus</h2>
+        <p class="hero-copy">
+            Bu sayfa urunun sadece teorik fazlarini degil, teslim edilecek isleri ve hangi host moduna ne zaman gecilecegini de gosterir.
+        </p>
+    </div>
+    <div class="panel-card panel-card--dim">
+        <h3>Faz Teslim Kontrolu</h3>
+        <div class="checklist-stack">
+            @foreach (var item in Model.DeliveryChecklist)
+            {
+                <article class="checklist-item @(item.IsDone ? "is-done" : "is-todo")">
+                    <div>
+                        <strong>@item.Title</strong>
+                        <p>@item.Description</p>
+                    </div>
+                    <a class="ghost-link" href="@item.ActionUrl">@item.ActionText</a>
+                </article>
+            }
+        </div>
+    </div>
+</section>
+
+<div class="split-layout">
+    <section class="panel-card">
+        <h2>Host Modlari</h2>
+        <ul class="clean-list">
+            @foreach (var host in Model.HostModes)
+            {
+                <li>@host</li>
+            }
+        </ul>
+    </section>
+
+    <section class="panel-card panel-card--dim">
+        <h2>Katmanlar</h2>
+        <ul class="clean-list">
+            @foreach (var layer in Model.ArchitectureLayers)
+            {
+                <li>@layer</li>
+            }
+        </ul>
+    </section>
+</div>
+
+<section class="section-grid section-grid--three">
+    @foreach (var phase in Model.Phases)
+    {
+        <article class="phase-card phase-card--expanded">
+            <div class="phase-topline">
+                <p class="phase-badge">@phase.Phase</p>
+                <span class="chip">@phase.Status</span>
+            </div>
+            <h2>@phase.Title</h2>
+            <p>@phase.Description</p>
+            <p class="phase-outcome"><strong>Hedef:</strong> @phase.Outcome</p>
+            <ul class="clean-list">
+                @foreach (var item in phase.Highlights)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+            <h3>Teslimatlar</h3>
+            <ul class="clean-list clean-list--compact">
+                @foreach (var item in phase.Deliverables)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+            <h3>Siradaki Adimlar</h3>
+            <ul class="clean-list clean-list--compact">
+                @foreach (var item in phase.NextSteps)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+        </article>
+    }
+</section>
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Kargo Gorsel Katmani</p>
+        <h2>Panelde kullanilan provider yuzeyleri</h2>
+    </div>
+</section>
+
+<section class="provider-mosaic">
+    @foreach (var visual in Model.ProviderVisuals)
+    {
+        <article class="provider-mosaic-card @visual.AccentClass">
+            @if (!string.IsNullOrWhiteSpace(visual.ImageUrl))
+            {
+                <img src="@visual.ImageUrl" alt="@visual.ProviderName gorseli" loading="lazy" />
+            }
+            else
+            {
+                <div class="provider-visual-fallback">
+                    <span>@visual.ProviderName.Substring(0, Math.Min(3, visual.ProviderName.Length)).ToUpperInvariant()</span>
+                </div>
+            }
+            <div>
+                <strong>@visual.ProviderName</strong>
+                <p>@visual.Caption</p>
+            </div>
+        </article>
+    }
+</section>

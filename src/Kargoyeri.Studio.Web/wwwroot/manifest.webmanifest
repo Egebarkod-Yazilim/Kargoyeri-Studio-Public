@@ -1,0 +1,34 @@
+{
+  "name": "Kargoyeri Studio",
+  "short_name": "Kargoyeri",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "description": "Kargoyeri Studio operator ve saha kullanimi icin PWA kabugu.",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Siparisler",
+      "short_name": "Siparisler",
+      "url": "/Shipments"
+    },
+    {
+      "name": "Bildirimler",
+      "short_name": "Bildirimler",
+      "url": "/Notifications"
+    },
+    {
+      "name": "Mobil Operasyon",
+      "short_name": "Mobil",
+      "url": "/mobile"
+    }
+  ]
+}

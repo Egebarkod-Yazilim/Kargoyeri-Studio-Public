@@ -1,0 +1,338 @@
+﻿@model CustomerDashboardViewModel
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Kargoyeri.Studio.Core.Resources.SharedResource> L
+@{
+    ViewData["Title"] = "Panel";
+    if (!string.IsNullOrWhiteSpace(Model.BrandDisplayName))
+    {
+        ViewData["Title"] = Model.BrandDisplayName + " Panel";
+    }
+
+    var totalStatus = Model.ShipmentsByStatus.Values.Sum();
+    var totalProvider = Model.ShipmentsByProvider.Values.Sum();
+    var donutBg = string.Empty;
+    if (totalStatus > 0)
+    {
+        var donutSegments = new List<string>();
+        var acc = 0.0;
+        foreach (var kv in Model.ShipmentsByStatus)
+        {
+            var pct = kv.Value * 360.0 / totalStatus;
+            donutSegments.Add($"{StatusColor(kv.Key)} {acc:0.##}deg {(acc + pct):0.##}deg");
+            acc += pct;
+        }
+        donutBg = "background:conic-gradient(" + string.Join(",", donutSegments) + ");";
+    }
+
+    string StatusColor(string s) => s switch
+    {
+        "Delivered" => "#10b981",
+        "InTransit" => "#3b82f6",
+        "LabelReady" => "#0ea5e9",
+        "ProviderAccepted" => "#0ea5e9",
+        "Pending" => "#f59e0b",
+        "Queued" => "#f59e0b",
+        "Cancelled" => "#ef4444",
+        "Failed" => "#ef4444",
+        _ => "#94a3b8"
+    };
+
+    string StatusLabel(string s) => s switch
+    {
+        "Delivered" => "Teslim Edildi",
+        "InTransit" => "Yolda",
+        "LabelReady" => "Etiket Hazir",
+        "ProviderAccepted" => "Kargoda",
+        "Pending" => "Hazirlaniyor",
+        "Queued" => "Kuyrukta",
+        "Cancelled" => L["Status_Cancelled"].Value,
+        "Failed" => "Basarisiz",
+        _ => s
+    };
+}
+
+<style>
+    .brand-ribbon {
+        display:flex; align-items:center; justify-content:space-between; gap:14px;
+        padding:16px 18px; border-radius:14px; margin-bottom:20px;
+        background:linear-gradient(135deg,#f8fafc 0%,#eef2ff 100%);
+        border:1px solid #dbeafe;
+    }
+    .brand-ribbon .title { font-size:1rem; font-weight:700; color:#0f172a; }
+    .brand-ribbon .sub { font-size:.82rem; color:#64748b; }
+    .brand-ribbon .pill { background:rgba(15,23,42,.06); color:#0f172a; }
+    .cdash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
+    .cdash-kpi {
+        background:#fff; border:1px solid #e2e8f0; border-radius:14px;
+        padding:18px 20px; position:relative; overflow:hidden;
+        box-shadow:0 1px 2px rgba(15,23,42,.04);
+        transition:transform .2s, box-shadow .2s;
+    }
+    .cdash-kpi:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(15,23,42,.08); }
+    .cdash-kpi .kpi-label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:#64748b; font-weight:600; }
+    .cdash-kpi .kpi-value { font-size:34px; font-weight:700; color:#0f172a; margin:6px 0 2px; line-height:1; }
+    .cdash-kpi .kpi-sub { font-size:12px; color:#94a3b8; }
+    .cdash-kpi .kpi-icon { position:absolute; top:18px; right:18px; font-size:22px; opacity:.85; }
+    .cdash-kpi.tone-blue { background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border-color:#bfdbfe; }
+    .cdash-kpi.tone-blue .kpi-value { color:#1e40af; }
+    .cdash-kpi.tone-amber { background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%); border-color:#fde68a; }
+    .cdash-kpi.tone-amber .kpi-value { color:#92400e; }
+    .cdash-kpi.tone-violet { background:linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%); border-color:#ddd6fe; }
+    .cdash-kpi.tone-violet .kpi-value { color:#5b21b6; }
+    .cdash-kpi.tone-green { background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%); border-color:#a7f3d0; }
+    .cdash-kpi.tone-green .kpi-value { color:#065f46; }
+
+    .cdash-row { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:24px; }
+    @@media (max-width:980px) { .cdash-row { grid-template-columns:1fr; } }
+
+    .cdash-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px; }
+    .cdash-card h3 { margin:0 0 4px; font-size:14px; font-weight:700; color:#0f172a; letter-spacing:.2px; }
+    .cdash-card .card-sub { font-size:12px; color:#64748b; margin-bottom:14px; }
+
+    /* Trend bar chart (CSS-only) */
+    .trend-bars { display:flex; align-items:flex-end; gap:10px; height:140px; padding:10px 0; }
+    .trend-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .trend-bar {
+        width:100%; max-width:46px;
+        background:linear-gradient(180deg,#3b82f6 0%,#1d4ed8 100%);
+        border-radius:6px 6px 0 0;
+        min-height:4px;
+        position:relative;
+        transition:transform .2s;
+    }
+    .trend-bar:hover { transform:scaleY(1.05); }
+    .trend-bar .trend-count {
+        position:absolute; top:-22px; left:50%; transform:translateX(-50%);
+        font-size:11px; font-weight:700; color:#1e293b;
+    }
+    .trend-bar.is-zero { background:#e2e8f0; }
+    .trend-bar.is-zero .trend-count { color:#94a3b8; }
+    .trend-label { font-size:10.5px; color:#64748b; font-weight:600; }
+    .trend-bar.is-today { background:linear-gradient(180deg,#10b981 0%,#047857 100%); }
+
+    /* Status donut (conic-gradient) */
+    .donut-wrap { display:flex; align-items:center; gap:18px; }
+    .donut {
+        width:120px; height:120px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        position:relative; flex-shrink:0;
+    }
+    .donut::after {
+        content:""; position:absolute; inset:18px;
+        background:#fff; border-radius:50%;
+    }
+    .donut-center { position:relative; z-index:1; text-align:center; }
+    .donut-center .n { font-size:24px; font-weight:700; color:#0f172a; line-height:1; }
+    .donut-center .l { font-size:10px; text-transform:uppercase; color:#94a3b8; letter-spacing:.6px; }
+
+    .legend { flex:1; display:flex; flex-direction:column; gap:6px; }
+    .legend-row { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+    .legend-row .swatch { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+    .legend-row .name { flex:1; color:#334155; }
+    .legend-row .val { color:#0f172a; font-weight:600; font-variant-numeric:tabular-nums; }
+
+    /* Provider list bars */
+    .provider-list { display:flex; flex-direction:column; gap:10px; }
+    .provider-row .prov-head { display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:4px; }
+    .provider-row .prov-head .name { font-weight:600; color:#0f172a; }
+    .provider-row .prov-head .val { color:#64748b; font-variant-numeric:tabular-nums; }
+    .provider-row .prov-bar-bg { height:6px; background:#f1f5f9; border-radius:999px; overflow:hidden; }
+    .provider-row .prov-bar-fill {
+        height:100%;
+        background:linear-gradient(90deg,#8b5cf6 0%,#6366f1 100%);
+        border-radius:999px;
+    }
+
+    /* Recent activity list */
+    .recent-list { display:flex; flex-direction:column; }
+    .recent-row {
+        display:grid; grid-template-columns:36px 1fr auto; gap:12px;
+        padding:11px 0; border-bottom:1px solid #f1f5f9;
+        align-items:center;
+    }
+    .recent-row:last-child { border-bottom:none; }
+    .recent-icon {
+        width:36px; height:36px; border-radius:10px;
+        display:flex; align-items:center; justify-content:center;
+        font-size:16px;
+    }
+    .recent-meta { min-width:0; }
+    .recent-meta .ref { font-size:13px; font-weight:600; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .recent-meta .sub { font-size:11.5px; color:#64748b; }
+    .pill { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap; }
+
+    .empty-hint { text-align:center; padding:24px 12px; color:#94a3b8; font-size:13px; }
+    .empty-hint .empty-icon { font-size:34px; opacity:.5; display:block; margin-bottom:8px; }
+</style>
+
+@if (!string.IsNullOrWhiteSpace(Model.BrandDisplayName) || !string.IsNullOrWhiteSpace(Model.PartnerLabel))
+{
+    <div class="brand-ribbon" style="@(string.IsNullOrWhiteSpace(Model.AccentColor) ? "" : $"border-color:{Model.AccentColor}40;")">
+        <div>
+            <div class="title">@(Model.BrandDisplayName ?? Model.WorkspaceName)</div>
+            @if (!string.IsNullOrWhiteSpace(Model.PartnerLabel))
+            {
+                <div class="sub">@Model.PartnerLabel</div>
+            }
+        </div>
+        <span class="pill">White-label aktif</span>
+    </div>
+}
+
+@* â”€â”€ KPI'lar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="cdash-grid">
+    <div class="cdash-kpi tone-blue">
+        <span class="kpi-icon">&#128230;</span>
+        <div class="kpi-label">Bugun</div>
+        <div class="kpi-value">@Model.TodayCount</div>
+        <div class="kpi-sub">olusturulan gonderi</div>
+    </div>
+    <div class="cdash-kpi tone-violet">
+        <span class="kpi-icon">&#128202;</span>
+        <div class="kpi-label">Son 7 Gun</div>
+        <div class="kpi-value">@Model.Last7DaysCount</div>
+        <div class="kpi-sub">toplam gonderi</div>
+    </div>
+    <div class="cdash-kpi tone-amber">
+        <span class="kpi-icon">&#128666;</span>
+        <div class="kpi-label">Su An Yolda</div>
+        <div class="kpi-value">@Model.InTransitCount</div>
+        <div class="kpi-sub">aktif gonderi</div>
+    </div>
+    <div class="cdash-kpi tone-green">
+        <span class="kpi-icon">&#9989;</span>
+        <div class="kpi-label">Bu Ay Teslim</div>
+        <div class="kpi-value">@Model.DeliveredThisMonth</div>
+        <div class="kpi-sub">teslim edilen</div>
+    </div>
+</div>
+
+@* â”€â”€ Trend (7 gun) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="cdash-card" style="margin-bottom:16px;">
+    <h3>Son 7 Gun Trendi</h3>
+    <div class="card-sub">Gunluk olusturulan gonderi sayisi (yesil = bugun)</div>
+    <div class="trend-bars">
+        @for (var i = 0; i < Model.TrendCounts.Count; i++)
+        {
+            var c = Model.TrendCounts[i];
+            var heightPct = Model.TrendPeak == 0 ? 4 : Math.Max(4, (int)(c * 100.0 / Model.TrendPeak));
+            var isToday = i == Model.TrendCounts.Count - 1;
+            var classes = "trend-bar" + (c == 0 ? " is-zero" : "") + (isToday ? " is-today" : "");
+            <div class="trend-bar-wrap">
+                <div class="@classes" style="height:@(heightPct)%;">
+                    <span class="trend-count">@c</span>
+                </div>
+                <div class="trend-label">@Model.TrendLabels[i]</div>
+            </div>
+        }
+    </div>
+</div>
+
+@* â”€â”€ Status donut + Provider bars â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="cdash-row">
+    <div class="cdash-card">
+        <h3>Durum Dagilimi</h3>
+        <div class="card-sub">Aktif gonderilerin durum bazinda dagilimi</div>
+        @if (totalStatus == 0)
+        {
+            <div class="empty-hint">
+                <span class="empty-icon">&#128230;</span>
+                Henuz gonderi yok. Ilk gonderiyi olusturduktan sonra burada gorulur.
+            </div>
+        }
+        else
+        {
+            <div class="donut-wrap">
+                <div class="donut" style="@donutBg">
+                    <div class="donut-center">
+                        <div class="n">@totalStatus</div>
+                        <div class="l">toplam</div>
+                    </div>
+                </div>
+                <div class="legend">
+                    @foreach (var kv in Model.ShipmentsByStatus)
+                    {
+                        var pct = totalStatus == 0 ? 0 : kv.Value * 100 / totalStatus;
+                        <div class="legend-row">
+                            <span class="swatch" style="background:@StatusColor(kv.Key);"></span>
+                            <span class="name">@StatusLabel(kv.Key)</span>
+                            <span class="val">@kv.Value <small style="color:#94a3b8;font-weight:400;">(@(pct)%)</small></span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="cdash-card">
+        <h3>Kargo Firmalari</h3>
+        <div class="card-sub">Firma bazinda gonderi pay&#305;</div>
+        @if (totalProvider == 0)
+        {
+            <div class="empty-hint">
+                <span class="empty-icon">&#128666;</span>
+                Henuz firma kullanilmadi.
+            </div>
+        }
+        else
+        {
+            <div class="provider-list">
+                @{ var maxProv = Model.ShipmentsByProvider.Values.DefaultIfEmpty(1).Max(); }
+                @foreach (var kv in Model.ShipmentsByProvider)
+                {
+                    var widthPct = maxProv == 0 ? 0 : kv.Value * 100 / maxProv;
+                    <div class="provider-row">
+                        <div class="prov-head">
+                            <span class="name">@kv.Key</span>
+                            <span class="val">@kv.Value</span>
+                        </div>
+                        <div class="prov-bar-bg">
+                            <div class="prov-bar-fill" style="width:@(widthPct)%;"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@* â”€â”€ Recent activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="cdash-card">
+    <h3>Son Hareketler</h3>
+    <div class="card-sub">En son olusturulan 6 gonderi</div>
+    @if (Model.RecentShipments.Count == 0)
+    {
+        <div class="empty-hint">
+            <span class="empty-icon">&#128221;</span>
+            Henuz hareket yok.
+            <div style="margin-top:10px;">
+                <a asp-controller="Shipments" asp-action="Index" class="btn-primary"
+                   style="display:inline-block;background:#0f172a;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+                    Ilk gonderiyi olustur
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="recent-list">
+            @foreach (var s in Model.RecentShipments)
+            {
+                var statusKey = s.Status.ToString();
+                var color = StatusColor(statusKey);
+                <div class="recent-row">
+                    <div class="recent-icon" style="background:@(color)20;color:@color;">&#128230;</div>
+                    <div class="recent-meta">
+                        <div class="ref">@s.ShipmentReference</div>
+                        <div class="sub">@s.Provider &middot; @s.CreatedAtUtc.ToLocalTime().ToString("dd.MM HH:mm")</div>
+                    </div>
+                    <span class="pill" style="background:@(color)18;color:@color;">@StatusLabel(statusKey)</span>
+                </div>
+            }
+        </div>
+        <div style="margin-top:14px;text-align:right;">
+            <a asp-controller="Shipments" asp-action="Index" style="font-size:13px;color:#1d4ed8;text-decoration:none;font-weight:600;">
+                Tumunu gor &rarr;
+            </a>
+        </div>
+    }
+</div>

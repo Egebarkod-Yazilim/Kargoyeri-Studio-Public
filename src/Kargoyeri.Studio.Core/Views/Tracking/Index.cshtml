@@ -1,0 +1,26 @@
+@model PublicTrackingFormViewModel
+@{
+    ViewData["Title"] = "Kargo Takip";
+    Layout = "_TrackLayout";
+}
+
+<div class="track-card">
+    <h1>Kargo Takibi</h1>
+    <p class="lead">Kargonuzun guncel durumunu sorgulamak icin takip numaranizi giriniz.</p>
+
+    <form asp-action="Submit" method="post" novalidate>
+        @Html.AntiForgeryToken()
+        <label style="display:block;">
+            <input asp-for="TrackingNumber" class="form-input" placeholder="orn. 1234567890" autofocus />
+            <span asp-validation-for="TrackingNumber" class="field-error"></span>
+        </label>
+        <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+            <button type="submit" class="primary-btn">Sorgula</button>
+        </div>
+    </form>
+
+    <div class="kvkk-note">
+        Bu sayfa KVKK kapsaminda yalnizca kargo durumunu gosterir. Alici adi ve adresi
+        gizlilik gerekcesiyle maskelenir; tam bilgi yalnizca kargonun gondericisi tarafindan goruluebilir.
+    </div>
+</div>

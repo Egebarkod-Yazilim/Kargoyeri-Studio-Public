@@ -1,0 +1,79 @@
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Hoş geldin";
+    var step = (int)(ViewData["Step"] ?? 1);
+
+    var steps = new (string Label, string Icon, string Title, string Body, string CtaText, string CtaUrl)[]
+    {
+        ("Workspace", "\U0001F3E2",
+         "Workspace tanimi",
+         "Musteri hesabinin baglandigi workspace ayarlarini incele. Workspace adi, varsayilan kargo saglayicilarin ve marka renklerin burada.",
+         "Workspace ayarlarina git", Url.Action("Index", "AccountData") ?? "/AccountData"),
+
+        ("API Key", "\U0001F511",
+         "API anahtarini olustur",
+         "Entegrasyonlar icin bir API anahtari uret. Anahtarlari guvenli bir yerde sakla; ekran disinda tekrar gosterilmez.",
+         "API Keys sayfasi", Url.Action("Index", "ApiKeys") ?? "/ApiKeys"),
+
+        ("Test Gonderi", "\U0001F4E6",
+         "Ilk test gonderisini olustur",
+         "Saglayici baglantilarinin sagligini dogrulamak icin kucuk bir test gonderisi olustur. Etiket uretebiliyor musun, takip numarasi geliyor mu?",
+         "Yeni gonderi", Url.Action("Index", "Shipments") ?? "/Shipments"),
+
+        ("Webhook", "\U0001F517",
+         "Webhook hedefini ayarla",
+         "Durum guncellemelerinin kendi sistemine push edilmesi icin bir webhook URL'i tanimla. Imza dogrulamasi otomatik aktif.",
+         "Webhook delivery", Url.Action("Index", "WebhookDelivery") ?? "/WebhookDelivery")
+    };
+
+    var current = steps[step - 1];
+}
+
+<div class="wizard-shell">
+    <div class="wizard-steps" aria-label="Kurulum adimlari">
+        @for (int i = 0; i < steps.Length; i++)
+        {
+            var s = steps[i];
+            var n = i + 1;
+            var stateClass = n < step ? "is-done" : n == step ? "is-active" : string.Empty;
+            <div class="wizard-step @stateClass">
+                <div class="num">@(n < step ? "\u2713" : n.ToString())</div>
+                <div class="label">@s.Label</div>
+            </div>
+        }
+    </div>
+
+    <div class="wizard-card">
+        <div style="font-size:2.4rem; line-height:1; margin-bottom:6px;">@current.Icon</div>
+        <h2>@current.Title</h2>
+        <p class="lead">@current.Body</p>
+
+        <div style="background:var(--panel-dim); border-radius:10px; padding:14px 16px; font-size:.86rem; color:var(--muted);">
+            <strong style="color:var(--text);">Adim @step / @steps.Length</strong>
+            &nbsp;&middot;&nbsp; Bu adimi tamamladiktan sonra "Sonraki" ile devam et. Istedigin zaman kapatip geri donebilirsin.
+        </div>
+
+        <a href="@current.CtaUrl" class="empty-state-cta" style="margin-top:18px;">
+            @current.CtaText &rarr;
+        </a>
+
+        <div class="wizard-actions">
+            @if (step > 1)
+            {
+                <a class="ghost-link" href="@Url.Action("Index", "Onboarding", new { step = step - 1 })">&larr; Onceki</a>
+            }
+            else
+            {
+                <span></span>
+            }
+
+            @if (step < steps.Length)
+            {
+                <a class="empty-state-cta" href="@Url.Action("Index", "Onboarding", new { step = step + 1 })">Sonraki &rarr;</a>
+            }
+            else
+            {
+                <a class="empty-state-cta" href="@Url.Action("Index", "Home")">Bitir &check;</a>
+            }
+        </div>
+    </div>
+</div>

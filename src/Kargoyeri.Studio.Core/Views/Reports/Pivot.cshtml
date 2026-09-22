@@ -1,0 +1,83 @@
+﻿@model PivotReportPageViewModel
+@{
+    ViewData["Title"] = "Pivot Rapor";
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">BI</p>
+        <h1 style="margin:0;font-size:1.35rem;">Pivot Rapor</h1>
+    </div>
+</div>
+
+<section class="panel-card" style="margin-bottom:20px;">
+    <form method="get" asp-action="Pivot" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <label>
+            <span>Baslangic</span>
+            <input type="date" name="from" value="@Model.Filter.From" class="form-input" />
+        </label>
+        <label>
+            <span>Bitis</span>
+            <input type="date" name="to" value="@Model.Filter.To" class="form-input" />
+        </label>
+        <label>
+            <span>Gruplama</span>
+            <select name="groupBy" class="form-input">
+                <option value="provider" selected="@(Model.GroupBy == "provider" ? "selected" : null)">Provider</option>
+                <option value="status" selected="@(Model.GroupBy == "status" ? "selected" : null)">Durum</option>
+                <option value="city" selected="@(Model.GroupBy == "city" ? "selected" : null)">Sehir</option>
+                <option value="day" selected="@(Model.GroupBy == "day" ? "selected" : null)">Gun</option>
+            </select>
+        </label>
+        <button type="submit" class="primary-button">Raporu Uygula</button>
+    </form>
+</section>
+
+<section class="panel-card">
+    @if (!Model.Rows.Any())
+    {
+        <div class="empty-state" style="padding:24px;">
+            <div class="empty-state-icon">&#128202;</div>
+            <h2>Pivot sonucu yok</h2>
+            <p>Secilen tarih araliginda raporlanacak gonderi bulunamadi.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-shell">
+            <table class="studio-table">
+                <thead>
+                    <tr>
+                        <th>Grup</th>
+                        <th style="text-align:right;">Gonderi</th>
+                        <th style="text-align:right;">Teslim</th>
+                        <th style="text-align:right;">Transitte</th>
+                        <th style="text-align:right;">Hata</th>
+                        <th style="text-align:right;">İptal</th>
+                        <th style="text-align:right;">COD Tutar</th>
+                        <th style="text-align:right;">Basari %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <td>@row.Key</td>
+                            <td style="text-align:right;">@row.ShipmentCount</td>
+                            <td style="text-align:right;color:#16a34a;">@row.DeliveredCount</td>
+                            <td style="text-align:right;">@row.InTransitCount</td>
+                            <td style="text-align:right;color:#dc2626;">@row.FailedCount</td>
+                            <td style="text-align:right;">@row.CancelledCount</td>
+                            <td style="text-align:right;">@row.CodAmount.ToString("F2")</td>
+                            <td style="text-align:right;">
+                                <span class="status-pill @(row.SuccessRate >= 80 ? "status-pill--ready" : row.SuccessRate < 50 ? "status-pill--pending" : "")">
+                                    %@row.SuccessRate.ToString("F1")
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

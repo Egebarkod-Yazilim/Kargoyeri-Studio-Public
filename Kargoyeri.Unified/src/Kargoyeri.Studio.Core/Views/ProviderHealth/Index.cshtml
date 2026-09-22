@@ -1,0 +1,73 @@
+@model ProviderHealthPageViewModel
+@{
+    ViewData["Title"] = "Kargo Firmasi Sagligi";
+    string Pill(double rate) => rate >= 99 ? "success" : rate >= 95 ? "info" : rate >= 80 ? "warning" : "danger";
+}
+
+<section class="panel-card" style="max-width:1080px;">
+    <p class="eyebrow">@Model.TenantName</p>
+    <h1 style="margin:6px 0 8px;">Kargo Firmasi Sagligi</h1>
+    <p class="provider-index-note">
+        Son @Model.WindowText icinde tenant'a ait kargo firmalarinin success rate, p95 latency ve son hata bilgileri.
+    </p>
+
+    <div style="display:flex;gap:8px;margin:16px 0;">
+        @foreach (var w in new[] { "1h", "6h", "24h", "7d" })
+        {
+            var active = string.Equals(w, Model.WindowText, StringComparison.OrdinalIgnoreCase);
+            <a class="@(active ? "primary-button" : "ghost-link")"
+               style="padding:6px 14px;border-radius:8px;@(active ? "" : "border:1px solid #cbd5e1;")"
+               asp-action="Index" asp-route-window="@w">@w</a>
+        }
+    </div>
+
+    @if (Model.Summaries.Count == 0)
+    {
+        <p style="color:#94a3b8;font-size:.9rem;">Bu tenant icin tanimli kargo firmasi yok veya henuz probe verisi toplanmadi.</p>
+    }
+    else
+    {
+        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+            <thead>
+                <tr style="background:#f1f5f9;">
+                    <th style="text-align:left;padding:10px;border:1px solid #e2e8f0;">Firma</th>
+                    <th style="text-align:right;padding:10px;border:1px solid #e2e8f0;">Probe</th>
+                    <th style="text-align:right;padding:10px;border:1px solid #e2e8f0;">Basari</th>
+                    <th style="text-align:right;padding:10px;border:1px solid #e2e8f0;">Hata Orani</th>
+                    <th style="text-align:right;padding:10px;border:1px solid #e2e8f0;">P95 Latency</th>
+                    <th style="text-align:left;padding:10px;border:1px solid #e2e8f0;">Son Kontrol</th>
+                    <th style="text-align:left;padding:10px;border:1px solid #e2e8f0;">Son Hata</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Summaries.OrderBy(x => x.Provider.ToString()))
+                {
+                    <tr>
+                        <td style="padding:10px;border:1px solid #e2e8f0;"><strong>@s.Provider</strong></td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">@s.ProbeCount</td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">
+                            <span class="badge @Pill(s.SuccessRate)">@s.SuccessRate.ToString("0.0")%</span>
+                        </td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;color:@(s.ErrorRate > 5 ? "#dc2626" : "#475569");">
+                            @s.ErrorRate.ToString("0.0")%
+                        </td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">
+                            @(s.P95LatencyMs is null ? "—" : s.P95LatencyMs.Value + " ms")
+                        </td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;font-size:.85rem;color:#64748b;">
+                            @(s.LastCheckedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "—")
+                        </td>
+                        <td style="padding:10px;border:1px solid #e2e8f0;font-size:.82rem;color:#dc2626;max-width:280px;word-break:break-word;">
+                            @(string.IsNullOrWhiteSpace(s.LastError) ? "—" : s.LastError)
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <div class="kvkk-note" style="background:#f1f5f9;border-radius:10px;padding:12px 14px;font-size:12px;color:#475569;margin-top:18px;">
+        Probe verisi <code>provider-health/</code> klasoru altina <code>provider-health-YYYYMMDD.jsonl</code>
+        olarak yazilir. Servis kapansa bile son @(2) gunluk kayitlar yeniden yuklenir.
+    </div>
+</section>

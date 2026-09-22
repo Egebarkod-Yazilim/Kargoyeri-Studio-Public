@@ -1,0 +1,14 @@
+@{
+    ViewData["Title"] = "Kargo Takip";
+}
+<form class="embed-form" method="get" action="">
+    <input type="text" name="t" placeholder="Takip numaras&#305;" required minlength="4"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();var v=this.value.trim();if(v) location.href = window.location.pathname.replace(/\/?$/,'/') + encodeURIComponent(v);}" />
+    <button type="button"
+            onclick="var v=this.previousElementSibling.value.trim();if(v) location.href=window.location.pathname.replace(/\/?$/,'/') + encodeURIComponent(v);">
+        Sorgula
+    </button>
+</form>
+<p style="margin:14px 0 0;color:#64748b;font-size:12px;">
+    Takip numaranizi giriniz. Sonuclar gerceklesen olaylarla birlikte goruntulenir.
+</p>

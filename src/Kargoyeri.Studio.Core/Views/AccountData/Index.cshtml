@@ -1,0 +1,87 @@
+@model AccountDataViewModel
+@{
+    ViewData["Title"] = "Hesabim ve Verilerim";
+    var s = Model.DeletionState;
+}
+
+<section class="panel-card" style="max-width:760px;">
+    <p class="eyebrow">KVKK md. 7 & 11 — Verilerim</p>
+    <h1 style="margin:6px 0 16px;">@Model.TenantName</h1>
+
+    <div class="meta-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:18px;">
+        <div><small style="color:#94a3b8;">MUSTERI KODU</small><br/><strong>@Model.TenantKey</strong></div>
+        <div><small style="color:#94a3b8;">DURUM</small><br/>
+            @if (Model.IsActive) { <span class="badge success">Aktif</span> }
+            else { <span class="badge danger">Pasif</span> }
+        </div>
+        <div><small style="color:#94a3b8;">YETKILI KARGO FIRMA SAYISI</small><br/><strong>@Model.ProviderCount</strong></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">
+        <a class="primary-button" asp-action="ExportMyData">PDF + JSON Paketi Indir</a>
+        <span style="font-size:.82rem;color:var(--muted);align-self:center;">
+            Son 30 gunun gonderi, bildirim, audit ve panel hareketleri zip paketi olarak hazirlanir.
+        </span>
+    </div>
+
+    @if (s.HasRequest && (s.IsPending || s.IsApproved))
+    {
+        <div class="validation-summary-errors" style="background:#fef3c7;color:#92400e;border-color:#fde68a;margin-top:18px;">
+            <strong>Devam eden silme talebi var.</strong><br/>
+            <small>
+                Talep tarihi: <strong>@s.RequestedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> ·
+                Talep eden: <strong>@s.RequestedBy</strong> ·
+                Durum:
+                @if (s.IsApproved) { <span class="badge danger">Admin onayli</span> }
+                else { <span class="badge warning">Admin onayi bekliyor</span> }
+            </small>
+            <p style="margin:10px 0 0;">
+                Hard-delete tarihi: <strong>@s.HardDeleteAt?.ToLocalTime().ToString("dd.MM.yyyy")</strong>
+                (kalan: <strong>@s.DaysRemaining gun</strong>).
+                Bu sure icinde <a href="mailto:kvkk@kargoyeri.com">kvkk@kargoyeri.com</a> uzerinden iptal edebilirsiniz.
+            </p>
+            @if (!string.IsNullOrWhiteSpace(s.Reason))
+            {
+                <p style="margin:10px 0 0;font-size:.86rem;"><em>Talep gerekcesi:</em> @s.Reason</p>
+            }
+        </div>
+    }
+    else
+    {
+        <h2 style="font-size:1.05rem;margin:24px 0 6px;">Verilerimi Silme Talebi</h2>
+        <p class="provider-index-note">
+            KVKK md. 7 ve 11 kapsaminda hesabinizdaki kisisel verilerin silinmesini talep edebilirsiniz.
+            Talebiniz sonrasi:
+        </p>
+        <ul style="font-size:.88rem;color:#475569;line-height:1.7;">
+            <li>Hesabiniz <strong>derhal pasif</strong> hale getirilir, login engellenir.</li>
+            <li>@Model.GracePeriodDays gunluk geri-alma penceresi baslar (admin onayina sunulur).</li>
+            <li>Bu surenin sonunda gonderi alici bilgileriniz <strong>anonimlestirilir</strong>; faturalama referanslari (VUK md. 253 — 10 yil) korunur.</li>
+            <li>Operasyon log kayitlarinda kullanici kimliginiz <code>[SILINMIS-USER]</code> olarak degistirilir.</li>
+        </ul>
+
+        <form asp-action="RequestDeletion" method="post" class="form-grid" style="margin-top:18px;">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Gerekce (istege bagli)</span>
+                <textarea name="reason" rows="3" maxlength="500"
+                          placeholder="Ornek: Hizmeti artik kullanmiyorum."></textarea>
+            </label>
+            <label style="display:flex;gap:10px;align-items:flex-start;font-size:.86rem;">
+                <input type="checkbox" name="confirmCheckbox" value="true" required style="margin-top:3px;" />
+                <span>
+                    Yukaridaki sonuclari okudum ve anladim. Hesabimin pasiflestirilmesini ve
+                    @Model.GracePeriodDays gun sonra kalici silinmesini talep ediyorum.
+                </span>
+            </label>
+            <button class="primary-button" type="submit" style="background:#dc2626;border-color:#dc2626;">
+                Silme Talebi Olustur
+            </button>
+        </form>
+    }
+
+    <div class="kvkk-note" style="background:#f1f5f9;border-radius:10px;padding:12px 14px;font-size:12px;color:#475569;margin-top:24px;">
+        Detayli bilgi: <a href="/legal/data-deletion">Veri Silme Politikasi</a> ·
+        <a href="/legal/privacy">KVKK Aydinlatma Metni</a>
+    </div>
+</section>

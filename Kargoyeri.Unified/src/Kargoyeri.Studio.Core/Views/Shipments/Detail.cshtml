@@ -1,0 +1,310 @@
+@model ShipmentDetailPageViewModel
+@{
+    ViewData["Title"] = "Gonderi Detayi";
+
+    var isTerminal = Model.Shipment.Status.ToString().Contains("Delivered")
+                  || Model.Shipment.Status.ToString().Contains("Cancel")
+                  || Model.Shipment.Status.ToString().Contains("Return");
+    var hasError = !string.IsNullOrWhiteSpace(Model.Shipment.ErrorMessage);
+
+    // Provider-aware aksiyon kuralları
+    var pcode = Model.Shipment.Provider.ToString().ToLowerInvariant();
+
+    var cancelSupported   = pcode is not "ptt" and not "trendyolexpress";
+    var refreshIsLive     = pcode is "surat" or "hepsijet" or "ups" or "trendyolexpress";
+    var isTrendyol        = pcode == "trendyolexpress";
+    var isMarketplace     = isTrendyol;
+
+    string? cancelBlockNote = pcode switch
+    {
+        "ptt"             => "PTT Kargo API'si iptal operasyonunu desteklemiyor. Iptal icin PTT is yeri panelini kullanin.",
+        "trendyolexpress" => "Trendyol Express siparisleri Trendyol Satis Paneli (partner.trendyol.com) uzerinden iptal edilir.",
+        _                 => null
+    };
+
+    string? refreshNote = pcode switch
+    {
+        "mng"     => "MNG Kargo durumu simulasyon ilerletmesi ile guncellenir (gercek API sorgusu yok).",
+        "aras"    => "Aras Kargo durumu simulasyon ilerletmesi ile guncellenir (gercek API sorgusu yok).",
+        "ptt"     => "PTT Kargo durumu simulasyon ilerletmesi ile guncellenir.",
+        "yurtici" => "Yurtici Kargo durumu simulasyon ilerletmesi ile guncellenir.",
+        _         => null
+    };
+
+    // Provider gorsel etiket
+    string providerDisplay = pcode switch
+    {
+        "surat"           => "Surat Kargo — REST",
+        "hepsijet"        => "HepsiJet — REST",
+        "mng"             => "MNG Kargo — SOAP",
+        "aras"            => "Aras Kargo — SOAP",
+        "ptt"             => "PTT Kargo — SOAP",
+        "ups"             => "UPS — OAuth2 REST",
+        "trendyolexpress" => "Trendyol Express — Marketplace",
+        "yurtici"         => "Yurtici Kargo — Simulasyon",
+        _                 => Model.Shipment.Provider.ToString()
+    };
+}
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">@providerDisplay &rsaquo; Gonderi</p>
+        <h1>@Model.Shipment.ShipmentReference</h1>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="status-pill @(isTerminal ? "status-pill--ready" : hasError ? "status-pill--pending" : "")">
+            @Model.Shipment.Status
+        </span>
+        @if (!refreshIsLive)
+        {
+            <span class="cap-tag cap-tag--dim" title="@refreshNote">Sim Durum</span>
+        }
+        @if (!cancelSupported)
+        {
+            <span class="cap-tag" style="background:rgba(203,92,45,.1);color:#e05c4e;border-color:rgba(203,92,45,.2);">Iptal Desteklenmez</span>
+        }
+        <a class="ghost-link" asp-action="Index">Listeye Don</a>
+    </div>
+</section>
+
+@if (hasError)
+{
+    <div class="flash flash--warn" style="margin-bottom:16px;">
+        <strong>Hata:</strong> @Model.Shipment.ErrorMessage
+    </div>
+}
+
+<div class="split-layout split-layout--wide">
+    <section class="panel-card">
+        <h2>Temel Bilgiler</h2>
+        <ul class="clean-list">
+            <li>Siparis No: <strong>@Model.Shipment.OrderReference</strong></li>
+            <li>
+                Takip No: <strong>@(Model.Shipment.TrackingNumber ?? "Henuz yok")</strong>
+                @if (!string.IsNullOrWhiteSpace(Model.Shipment.TrackingNumber))
+                {
+                    <a href="@Url.Action("Detail", "Tracking", new { trackingNumber = Model.Shipment.TrackingNumber })"
+                       target="_blank" rel="noopener" style="margin-left:8px;font-size:12px;">Public sayfa ↗</a>
+                }
+            </li>
+            <li>Mesaj: @(Model.Shipment.ProviderMessage ?? "—")</li>
+            <li>Son kontrol: @(Model.Shipment.LastStatusCheckAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Henuz yok")</li>
+            <li>Retry sayisi: @Model.Shipment.RetryCount</li>
+        </ul>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Shipment.LabelUrl))
+        {
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+                <p class="eyebrow">Kargo Etiketi</p>
+                <div class="action-row action-row--left" style="margin-top:8px;">
+                    <a class="primary-button" href="@Model.Shipment.LabelUrl" target="_blank" rel="noreferrer noopener"
+                       style="font-size:.85rem;padding:8px 16px;">
+                        Etiketi Indir / Goster
+                    </a>
+                    <a class="ghost-link" href="@Model.Shipment.LabelUrl" download>Kaydet</a>
+                </div>
+            </div>
+        }
+
+        @if (!isTerminal)
+        {
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                <p class="eyebrow">Operasyon Aksiyonlari</p>
+
+                @* ── DURUM YENİLE ────────────────────────────────────────── *@
+                <div class="action-stack" style="margin-top:12px;">
+                    <form asp-action="Refresh" method="post" class="inline-form">
+                        <input asp-for="ActionForm.ShipmentReference" type="hidden" />
+                        <button class="secondary-button" type="submit">Durumu Yenile</button>
+                    </form>
+                    @if (!string.IsNullOrWhiteSpace(refreshNote))
+                    {
+                        <p class="op-action-note op-action-note--sim">@refreshNote</p>
+                    }
+                </div>
+
+                @* ── İPTAL ──────────────────────────────────────────────── *@
+                @if (cancelSupported)
+                {
+                    <details style="margin-top:16px;" id="cancel-details">
+                        <summary class="ghost-link" style="cursor:pointer;color:var(--accent);">
+                            Gonderiyi Iptal Et
+                        </summary>
+                        <div class="panel-card" style="margin-top:12px;background:rgba(203,92,45,.06);border-color:rgba(203,92,45,.2);">
+                            <p style="font-size:.88rem;color:var(--accent);margin:0 0 12px;">
+                                Bu islem geri alinamaz. Kargo firmasi tarafinda iptal akisi baslatilacaktir.
+                            </p>
+                            <form asp-action="Cancel" method="post" class="form-grid form-grid--dense"
+                                  onsubmit="return confirm('Gonderi iptal edilecek. Devam etmek istediginize emin misiniz?');">
+                                <input asp-for="ActionForm.ShipmentReference" type="hidden" />
+                                <label class="field-span">
+                                    <span>Iptal Nedeni <span style="color:#dc2626;">*</span></span>
+                                    <input asp-for="ActionForm.CancelReason"
+                                           placeholder="Musteri vazgecti / stok hatasi / yanlis adres..."
+                                           required minlength="5" maxlength="500" />
+                                    <span asp-validation-for="ActionForm.CancelReason" class="field-error"></span>
+                                    <small style="color:var(--muted);font-size:.72rem;">
+                                        En az 5 karakter. Bu metin kargo firmasina ve audit log'a kaydedilir.
+                                    </small>
+                                </label>
+                                <div class="action-row" style="margin-top:4px;">
+                                    <button class="danger-button" type="submit">Evet, Iptal Et</button>
+                                    <button type="button" class="ghost-link" onclick="document.getElementById('cancel-details').removeAttribute('open')">
+                                        Vazgec
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </details>
+                }
+                else if (!string.IsNullOrWhiteSpace(cancelBlockNote))
+                {
+                    <div class="op-action-note op-action-note--blocked" style="margin-top:14px;">
+                        <span class="op-action-note-icon">&#9888;</span>
+                        <span>@cancelBlockNote</span>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="panel-card panel-card--dim">
+        <h2>Teslimat Bilgisi</h2>
+        <ul class="clean-list">
+            <li>Alici: <strong>@Model.Shipment.Recipient.Name</strong></li>
+            <li>Telefon: @Model.Shipment.Recipient.Phone</li>
+            <li>Il / Ilce: @Model.Shipment.Recipient.City / @Model.Shipment.Recipient.District</li>
+            <li>Adres: @Model.Shipment.Recipient.AddressLine1</li>
+            @if (Model.Shipment.CollectionAmount.HasValue)
+            {
+                <li>Tahsilat: <strong>@Model.Shipment.CollectionAmount @Model.Shipment.CurrencyCode</strong></li>
+            }
+        </ul>
+
+        @* Trendyol marketplace ozel bilgiler *@
+        @if (isMarketplace)
+        {
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+                <p class="eyebrow">Marketplace Bilgisi</p>
+                <p style="font-size:.83rem;color:var(--muted);margin:6px 0 0;line-height:1.5;">
+                    Bu gonderi bir Trendyol marketplace depo atamasidir.
+                    Alici adresi ve kargo detaylari Trendyol sisteminden yonetilir.
+                    Siparis takibi icin Trendyol Satis Panelini kullanin.
+                </p>
+            </div>
+        }
+
+        @if (Model.AnomalyReport?.HasFindings == true)
+        {
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+                <p class="eyebrow">AI Anomali Uyarisi</p>
+                <p style="font-size:.83rem;color:var(--muted);margin:6px 0 8px;line-height:1.5;">
+                    @Model.AnomalyReport.Summary
+                </p>
+                <ul class="clean-list clean-list--compact">
+                    @foreach (var flag in Model.AnomalyReport.Flags)
+                    {
+                        <li><strong>@flag.Title:</strong> @flag.Message</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @* Provider entegrasyon notu *@
+        @if (!refreshIsLive && !isTerminal)
+        {
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+                <p class="eyebrow">Entegrasyon Notu</p>
+                <p style="font-size:.83rem;color:var(--muted);margin:6px 0 0;line-height:1.5;">
+                    @(pcode switch {
+                        "mng"     => "MNG Kargo entegrasyonu SOAP gonderi olusturma ve iptal destekler. Durum sorgusu gercek API yerine simulasyon ilerletmesi kullanir.",
+                        "aras"    => "Aras Kargo entegrasyonu SOAP gonderi olusturma ve iptal destekler. Durum sorgusu gercek API yerine simulasyon ilerletmesi kullanir.",
+                        "ptt"     => "PTT Kargo entegrasyonu SOAP gonderi olusturmayı destekler. İptal ve durum sorgusu desteklenmemektedir.",
+                        "yurtici" => "Yurtici Kargo kamuya acik API sunmadigi icin tum akis simulasyon uzerinden ilerler.",
+                        _         => ""
+                    })
+                </p>
+            </div>
+        }
+    </section>
+</div>
+
+<div class="split-layout split-layout--wide">
+    <section class="panel-card panel-card--dim">
+        <h2>Log Akisi</h2>
+        @if (!Model.Logs.Any())
+        {
+            <p style="color:var(--muted);font-size:.88rem;">Bu gonderi icin henuz log kaydi yok.</p>
+        }
+        else
+        {
+            <ul class="timeline">
+                @foreach (var log in Model.Logs)
+                {
+                    <li>
+                        <strong>@log.Operation</strong>
+                        <span class="status-pill @(log.Severity == "Error" ? "status-pill--pending" : "")" style="font-size:.72rem;">@log.Severity</span>
+                        <p>@log.Message</p>
+                        @if (!string.IsNullOrWhiteSpace(log.ProviderPayload))
+                        {
+                            <details>
+                                <summary style="cursor:pointer;font-size:.82rem;color:var(--muted);">Provider cevabi goster</summary>
+                                <pre class="code-block" style="margin-top:8px;">@log.ProviderPayload</pre>
+                            </details>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="panel-card">
+        <h2>Bildirim Akisi</h2>
+        @if (!Model.Notifications.Any())
+        {
+            <p style="color:var(--muted);font-size:.88rem;">Bu gonderi icin henuz bildirim kaydi yok.</p>
+        }
+        else
+        {
+            <ul class="timeline">
+                @foreach (var item in Model.Notifications)
+                {
+                    <li>
+                        <strong>@item.EventType</strong>
+                        <span style="font-size:.8rem;color:var(--muted);">@item.Channel / @item.Status</span>
+                        <p style="font-size:.85rem;">@item.Body</p>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+@section Scripts {
+    <style>
+        .op-action-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 7px;
+            font-size: .83rem;
+            line-height: 1.45;
+            margin-top: 8px;
+        }
+        .op-action-note--sim {
+            background: rgba(125,141,184,.07);
+            border: 1px solid rgba(125,141,184,.2);
+            color: #7d8db8;
+        }
+        .op-action-note--blocked {
+            background: rgba(203,92,45,.06);
+            border: 1px solid rgba(203,92,45,.2);
+            color: #e8a45a;
+        }
+        .op-action-note-icon {
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+    </style>
+}
