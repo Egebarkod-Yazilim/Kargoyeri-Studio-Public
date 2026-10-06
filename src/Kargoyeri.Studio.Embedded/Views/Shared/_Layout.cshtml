@@ -1,0 +1,137 @@
+@*
+    Kargoyeri — Embedded Layout
+    ====================================
+    Bu layout, Studio sayfalarini baska bir uygulamanin icine gomer.
+
+    KULLANIM SECENEKLERI:
+    1. Bu dosyayi oldugu gibi kullanin (kendi minimal tasarimiyla calisir)
+    2. Parent uygulamanizin layout'unu kullanmak icin:
+       - Bu dosyayi silin
+       - _ViewStart.cshtml'de Layout = "_YourParentLayout" yapin
+    3. Parent layout'u partial olarak sarmak icin:
+       - Layout = null; yapip RenderBody()'yi parent'inizin icerigine yerlestirin
+*@
+@using Kargoyeri.Studio.Core.Infrastructure
+@inject IStudioWorkspaceContext WorkspaceContext
+@inject WorkspaceBrandingStore BrandingStore
+@{
+    Layout = null;
+    var _ctrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    string NavClass(string ctrl) => _ctrl.Equals(ctrl, StringComparison.OrdinalIgnoreCase) ? "emb-nav-active" : "";
+    var isSuperAdmin = User.IsInRole(StudioRoles.SuperAdmin);
+    var isAdmin = User.IsInRole(StudioRoles.Admin) && !isSuperAdmin;
+    var theme = ViewContext.HttpContext.Request.Cookies["studio-theme"] ?? "light";
+    var tabScope = isSuperAdmin ? "superadmin" : isAdmin ? "admin" : "operator";
+    var branding = !isSuperAdmin && !isAdmin ? await BrandingStore.GetCurrentAsync() : new WorkspaceBrandingSettings();
+    var brandName = !isSuperAdmin && !isAdmin && !string.IsNullOrWhiteSpace(branding.DisplayName) ? branding.DisplayName : "Kargoyeri";
+    var partnerLabel = !isSuperAdmin && !isAdmin && !string.IsNullOrWhiteSpace(branding.PartnerLabel) ? branding.PartnerLabel : null;
+    var brandMark = string.Concat(brandName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => char.ToUpperInvariant(x[0])));
+    if (string.IsNullOrWhiteSpace(brandMark))
+    {
+        brandMark = "KY";
+    }
+}
+<!DOCTYPE html>
+<html lang="tr" data-theme="@theme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Kargoyeri</title>
+    <link rel="stylesheet" href="~/_content/Kargoyeri.Studio.Core/css/site.css" asp-append-version="true" />
+    @if (!string.IsNullOrWhiteSpace(branding.AccentColor))
+    {
+        <style>:root { --brand:@branding.AccentColor; --accent:@branding.AccentColor; }</style>
+    }
+    <style>
+        /* Embedded modda sayfa kabuğunu gizle, sadece icerik gorunsun */
+        .emb-shell { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); color: var(--text); }
+        .emb-topbar {
+            display: flex; align-items: center; gap: 0;
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            padding: 0 20px; height: 48px; flex-shrink: 0;
+        }
+        .emb-brand {
+            display: flex; align-items: center; gap: 8px;
+            font-weight: 700; font-size: .9rem; color: var(--text);
+            text-decoration: none; padding-right: 20px; border-right: 1px solid var(--border);
+            margin-right: 16px;
+        }
+        .emb-brand-mark {
+            width: 26px; height: 26px; border-radius: 6px;
+            background: var(--brand); color: #fff;
+            display: grid; place-items: center; font-size: .72rem; font-weight: 800;
+        }
+        .emb-nav { display: flex; gap: 2px; }
+        .emb-nav a {
+            padding: 6px 12px; border-radius: var(--radius-sm);
+            font-size: .83rem; color: var(--muted); text-decoration: none;
+            transition: background 120ms ease, color 120ms ease;
+        }
+        .emb-nav a:hover { background: var(--panel); color: var(--text); }
+        .emb-nav a.emb-nav-active { background: var(--brand-dim); color: var(--brand); font-weight: 600; }
+        .emb-content { flex: 1; padding: 24px 28px 40px; }
+        .emb-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: .8rem; color: var(--muted); }
+    </style>
+</head>
+<body>
+<div class="emb-shell">
+    <header class="emb-topbar">
+        <a class="emb-brand" asp-controller="Home" asp-action="Index">
+            <span class="emb-brand-mark">@brandMark</span>
+            <span>
+                @brandName
+                @if (!string.IsNullOrWhiteSpace(partnerLabel))
+                {
+                    <small style="display:block;font-size:.7rem;color:var(--muted);font-weight:500;">@partnerLabel</small>
+                }
+            </span>
+        </a>
+
+        <nav class="emb-nav">
+            <a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Dashboard</a>
+            <a class="@NavClass("Providers")" asp-controller="Providers" asp-action="Index">Firmalar</a>
+            <a class="@NavClass("Shipments")" asp-controller="Shipments" asp-action="Index">Siparisler</a>
+            <a class="@NavClass("BulkShipment")" asp-controller="BulkShipment" asp-action="Index">Toplu Gonderi</a>
+            <a class="@NavClass("Pickup")" asp-controller="Pickup" asp-action="Index">Kurye Cagir</a>
+            <a class="@NavClass("Reports")" asp-controller="Reports" asp-action="Index">Raporlar</a>
+            <a class="@NavClass("Notifications")" asp-controller="Notifications" asp-action="Index">Bildirimler</a>
+            <a class="@NavClass("WebhookDelivery")" asp-controller="WebhookDelivery" asp-action="Index">Webhook Teslimatlari</a>
+            @if (isSuperAdmin)
+            {
+                <a class="@NavClass("Workspaces")" asp-controller="Workspaces" asp-action="Index">Entegrasyon</a>
+                <a class="@NavClass("ApiKeys")" asp-controller="ApiKeys" asp-action="Index">API Anahtarlari</a>
+                <a class="@NavClass("AccountData")" asp-controller="AccountData" asp-action="Index">Veri Yonetimi</a>
+                <a class="@NavClass("Worker")" asp-controller="Worker" asp-action="Index">Worker</a>
+                <a class="@NavClass("Audit")" asp-controller="Audit" asp-action="Index">Audit</a>
+                <a class="@NavClass("Billing")" asp-controller="Billing" asp-action="Index">Faturalar</a>
+            }
+        </nav>
+
+        <div class="emb-topbar-right">
+            <span>@(isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : WorkspaceContext.GetCurrentName() ?? WorkspaceContext.GetCurrentCode())</span>
+            <button type="button" class="topbar-theme-toggle" data-theme-toggle aria-label="Temayı değiştir" title="Temayı değiştir">
+                <span class="theme-icon-light">☀</span><span class="theme-icon-dark">☾</span>
+                <span class="theme-toggle-label">@(theme == "dark" ? "Gündüz" : "Gece")</span>
+            </button>
+            <form asp-controller="Access" asp-action="Logout" method="post" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="ghost-link" style="font-size:.8rem;">Cikis</button>
+            </form>
+        </div>
+    </header>
+
+    <div class="workspace-tabs emb-tabs" data-workspace-tabs data-scope="@tabScope" aria-label="Açık sayfalar"></div>
+
+    <main class="emb-content">
+        @if (TempData["StudioMessage"] is string msg)
+        {
+            <div class="flash" style="margin-bottom:16px;">@msg</div>
+        }
+        @RenderBody()
+    </main>
+</div>
+
+<script src="~/_content/Kargoyeri.Studio.Core/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

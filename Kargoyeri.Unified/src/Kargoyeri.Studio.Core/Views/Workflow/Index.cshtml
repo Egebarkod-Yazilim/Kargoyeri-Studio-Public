@@ -1,0 +1,114 @@
+﻿@model WorkflowRulePageViewModel
+@{
+    ViewData["Title"] = "Workflow";
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Is Akisi Motoru</p>
+        <h1 style="margin:0;font-size:1.35rem;">Kural Tanimlari</h1>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start;">
+    <section class="panel-card">
+        <h2 style="margin-top:0;">Yeni Kural</h2>
+        <form method="post" asp-action="Create" class="form-grid">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Kural Adi</span>
+                <input asp-for="Editor.Name" class="form-input" />
+                <span asp-validation-for="Editor.Name" class="field-error"></span>
+            </label>
+            <label>
+                <span>@L["Label_Status"]</span>
+                <select asp-for="Editor.Status" class="form-input" asp-items="Html.GetEnumSelectList<Kargoyeri.Contracts.Enums.ShipmentStatusDto>()"></select>
+            </label>
+            <label>
+                <span>Esik (Saat)</span>
+                <input asp-for="Editor.ThresholdHours" class="form-input" type="number" min="1" max="720" />
+                <span asp-validation-for="Editor.ThresholdHours" class="field-error"></span>
+            </label>
+            <label>
+                <span>Kanal</span>
+                <select asp-for="Editor.Channel" class="form-input">
+                    <option value="@Kargoyeri.Contracts.Enums.NotificationChannelDto.Sms">Sms</option>
+                    <option value="@Kargoyeri.Contracts.Enums.NotificationChannelDto.Email">Email</option>
+                </select>
+            </label>
+            <label>
+                <span>Mesaj Sablonu</span>
+                <textarea asp-for="Editor.MessageTemplate" rows="5"></textarea>
+            </label>
+            <label style="display:flex;gap:8px;align-items:center;">
+                <input asp-for="Editor.OnlyOncePerShipment" type="checkbox" />
+                <span>Her gonderi icin bir kez tetikle</span>
+            </label>
+            <label style="display:flex;gap:8px;align-items:center;">
+                <input asp-for="Editor.IsEnabled" type="checkbox" />
+                <span>Kural aktif</span>
+            </label>
+            <button type="submit" class="primary-button">Kaydet</button>
+        </form>
+        <p style="margin:14px 0 0;font-size:.82rem;color:var(--muted);">
+            Desteklenen degiskenler: <code>{ShipmentReference}</code>, <code>{TrackingNumber}</code>, <code>{Status}</code>,
+            <code>{Provider}</code>, <code>{HoursInStatus}</code>, <code>{RecipientCity}</code>.
+        </p>
+    </section>
+
+    <section class="panel-card">
+        <div class="section-heading section-heading--tight" style="margin-bottom:16px;">
+            <div>
+                <p class="eyebrow">Aktif Kurallar</p>
+                <h2>Tetkik listesi</h2>
+            </div>
+        </div>
+
+        @if (!Model.Rules.Any())
+        {
+            <div class="empty-state" style="padding:24px;">
+                <div class="empty-state-icon">&#9881;</div>
+                <h2>Henuz workflow kurali yok</h2>
+                <p>Ornegin 48 saatten uzun sure transitte kalan gonderiler icin SMS hatirlatmasi tanimlayabilirsiniz.</p>
+            </div>
+        }
+        else
+        {
+            <div style="display:grid;gap:12px;">
+                @foreach (var rule in Model.Rules)
+                {
+                    <article class="panel-card" style="padding:14px 16px;border:1px solid var(--border);box-shadow:none;">
+                        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+                            <div>
+                                <strong>@rule.Name</strong>
+                                <div style="margin-top:6px;color:var(--muted);font-size:.84rem;">
+                                    @rule.Status durumunda @rule.ThresholdHours saat
+                                    @if (rule.Channel == Kargoyeri.Contracts.Enums.NotificationChannelDto.Sms)
+                                    {
+                                        <span> SMS</span>
+                                    }
+                                    else
+                                    {
+                                        <span> e-posta</span>
+                                    }
+                                    gonder
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <span class="status-pill @(rule.IsEnabled ? "status-pill--ready" : "status-pill--pending")">
+                                    @(rule.IsEnabled ? "Aktif" : "Pasif")
+                                </span>
+                                <form method="post" asp-action="Delete">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@rule.Id" />
+                                    <button type="submit" class="ghost-link">Sil</button>
+                                </form>
+                            </div>
+                        </div>
+                        <pre class="code-block" style="margin-top:10px;white-space:pre-wrap;">@rule.MessageTemplate</pre>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</div>

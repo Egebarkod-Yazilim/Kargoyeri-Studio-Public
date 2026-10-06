@@ -1,0 +1,83 @@
+@model TotpEnrollmentViewModel
+@{
+    ViewData["Title"] = "Iki Adimli Dogrulama (2FA)";
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Guvenlik</p>
+        <h1 style="margin:0;">Iki Adimli Dogrulama</h1>
+    </div>
+</div>
+
+<div class="panel-card" style="max-width:640px;margin-top:18px;">
+    @if (Model.AlreadyEnabled)
+    {
+        <p style="font-size:.95rem;">
+            <strong style="color:#16a34a;">Aktif</strong> — Hesabiniz iki adimli dogrulama ile korunuyor.
+            Her giriste sifrenize ek olarak authenticator uygulamanizdaki 6 haneli kod sorulacak.
+        </p>
+        <form asp-action="Disable" method="post" style="margin-top:16px;">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="secondary-button"
+                    style="color:#dc2626;border-color:#dc2626;"
+                    onclick="return confirm('2FA\'yi kapatmak istediginize emin misiniz? Hesabiniz daha az korunmus olacak.')">
+                2FA'yi Kapat
+            </button>
+        </form>
+    }
+    else if (string.IsNullOrWhiteSpace(Model.ProvisioningUri))
+    {
+        <p style="font-size:.9rem;color:var(--muted);">
+            Iki adimli dogrulama, hesabinizi sadece sifre ile degil — telefonunuzdaki authenticator
+            uygulamasi ile de korur. Google Authenticator, Microsoft Authenticator veya Authy gibi
+            standart uygulamalardan birini kullanabilirsiniz.
+        </p>
+        <form asp-action="Begin" method="post" style="margin-top:16px;">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="primary-button">2FA Kurulumunu Baslat</button>
+        </form>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Model.Message))
+        {
+            <div class="validation-summary-info" style="margin-bottom:14px;background:rgba(37,99,235,.08);padding:10px 12px;border-radius:8px;font-size:.85rem;">
+                @Model.Message
+            </div>
+        }
+
+        <h3 style="font-size:1rem;margin:0 0 8px;">1. QR Kodu Okutun</h3>
+        <div style="display:flex;justify-content:center;margin:14px 0;padding:16px;background:#fff;border:1px solid var(--border);border-radius:8px;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=@(Uri.EscapeDataString(Model.ProvisioningUri!))"
+                 alt="TOTP QR" style="display:block;" />
+        </div>
+        <p style="font-size:.82rem;color:var(--muted);">
+            QR kodu okutamiyorsaniz authenticator uygulamasina manuel olarak su secret'i girin:
+        </p>
+        <pre style="background:rgba(0,0,0,.04);padding:10px;border-radius:6px;font-size:.85rem;letter-spacing:.1em;text-align:center;">@Model.Secret</pre>
+
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);" />
+
+        <h3 style="font-size:1rem;margin:0 0 8px;">2. Kodu Dogrulayin</h3>
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="validation-summary-errors" style="margin-bottom:12px;">@Model.ErrorMessage</div>
+        }
+        <form asp-action="Confirm" method="post" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="TenantKey" />
+            <input type="hidden" asp-for="Username" />
+            <div style="display:flex;gap:10px;align-items:flex-end;">
+                <div style="flex:1;">
+                    <label style="font-size:.82rem;color:var(--muted);">Authenticator Kodu</label>
+                    <input asp-for="Code" class="form-input" inputmode="numeric"
+                           pattern="[0-9]{6}" maxlength="6"
+                           style="font-size:1.3rem;letter-spacing:.4em;text-align:center;font-family:monospace;" />
+                </div>
+                <button type="submit" class="primary-button">Dogrula ve Aktif Et</button>
+            </div>
+            <span asp-validation-for="Code" class="field-validation-error"></span>
+        </form>
+    }
+</div>

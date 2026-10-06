@@ -1,0 +1,1506 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Kargoyeri.Studio.Core</name>
+    </assembly>
+    <members>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.AccessController.Login(Kargoyeri.Studio.Core.Models.AccessLoginAdminViewModel,System.Threading.CancellationToken)">
+            <summary>Admin e-posta + parola ile giris (StudioAccess:Admins listesi).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.AccountDataController">
+             <summary>
+             KVKK md. 7 — Tenant kullanicisinin kendi verilerinin silinmesini talep etmesi
+             icin self-service akis (P1-#2).
+            
+             /account/data            → mevcut talep durumu + form
+             /account/data/request    → yeni talep olustur (POST)
+             /account/data/cancel     → bekleyen talebi iptal et (POST)
+            
+             Talep sonrasi:
+               1) tenant Metadata'ya kvkk.deletion.* alanlari yazilir
+               2) tenant pasif yapilir (IsActive = false) — login engellenir
+               3) 30 gun bekleme suresi sonra (DataRetentionService — P1-#3) hard-delete
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.ApiKeysController">
+             <summary>
+             Tenant bazli API anahtarlarinin yonetimi (P1-#4).
+            
+             /apikeys           → mevcut anahtarlarin listesi + yeni olusturma formu
+             /apikeys/create    → yeni anahtar uretir (plain anahtari TempData ile bir kez gosterir)
+             /apikeys/revoke    → anahtari pasiflestirir (auth disinda kalir)
+             /apikeys/delete    → anahtari kalici siler
+            
+             Yetki: tenant kullanicisi kendi tenant'inin anahtarlarini gorur.
+             Admin tum tenant'lar icin kullanabilir (tenantKey query param ile).
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.Api.ApiDocsController">
+            <summary>
+            REST API rotalarini ve kullanim orneklerini listeler.
+            GET /api-docs ile erisebilirsiniz.
+            Swashbuckle kurulabilirse bu controller kaldirilabilir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ProvidersApiController.List">
+            <summary>Tum provider'larin katalog listesini dondurur.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ProvidersApiController.Status(System.String,System.Threading.CancellationToken)">
+            <summary>Workspace bazinda provider durumlarini dondurur.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController">
+            <summary>
+            Dis sistemlerin gonderi verisi gondermesi ve sorgulamasi icin REST API.
+            Swagger/OpenAPI desteği icin Swashbuckle eklenebilir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.List(System.String,System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Workspace'e ait gonderi listesini dondurur (sayfalanmis).</summary>
+            <param name="workspace">Tenant kimligi (zorunlu).</param>
+            <param name="page">Sayfa numarasi (1'den baslar).</param>
+            <param name="pageSize">Sayfa basina kayit (1-100).</param>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.Get(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Tek gonderi detayini dondurur.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.Refresh(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Gonderi durumunu kargo firmasindan yeniler.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.Cancel(System.String,System.String,Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.CancelApiRequest,System.Threading.CancellationToken)">
+            <summary>Gonderiyi iptal eder. Iptal sebebi (Reason) en az 5 karakter olmalidir.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.Create(Kargoyeri.Contracts.Dtos.CreateShipmentRequest,System.Threading.CancellationToken)">
+            <summary>Dis sistemden gelen siparis bilgisi ile yeni kargo gonderisi olusturur.</summary>
+            <param name="request">Gonderici/alici adresi, paket bilgisi vb. icerir.</param>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.ShipmentsApiController.Logs(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Gonderiye ait operasyon log kayitlarini dondurur (provider istek/yanit ozetleri).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.Api.WebhookCallbackController">
+             <summary>
+             Kargo firmalari (Yurtici, MNG, Surat, Aras, PTT, UPS) bizim sistemimize gonderi
+             durum guncellemelerini POST etmek icin bu uca cagri yapar.
+            
+             URL kalibi:  POST /api/webhook/{provider}/{tenantKey}
+            
+             Auth (P1-#1): HMAC-SHA256 imza dogrulamasi.
+               Header: X-Kargoyeri-Signature: t=&lt;unix-seconds&gt;,v1=&lt;hex(hmac_sha256(secret, "t.body"))&gt;
+               Secret: tenant Metadata["webhook.inbound.secret"]
+               Replay penceresi: 5 dakika (timestamp simdi'ye gore +-300 sn icinde olmali).
+            
+             Geriye donuk uyumluluk: Eger X-Kargoyeri-Signature gonderilmemisse ve eski
+             X-Kargoyeri-Inbound-Secret header'i mevcutsa shared-secret esitligi denenir;
+             bu yol kullanildiginda warning log yazilir (gecis donemi — sonra kaldirilacak).
+            
+             Davranis: Payload'dan shipmentReference / trackingNumber cikarilir, ilgili
+                       gonderi RefreshShipmentAsync ile provider'dan dogrulanir (bizim
+                       sistemimiz inbound payload'a koru korune guvenmez — sadece bilgi
+                       tetikleyicisi olarak kullanir).
+             </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Controllers.Api.WebhookCallbackController.ReplayToleranceSeconds">
+            <summary>HMAC timestamp tolerance (anti-replay window) — 5 dakika.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.Api.WebhookCallbackController.VerifyHmacSignature(System.String,System.String,System.String)">
+            <summary>
+            Header format:  t=&lt;unix-seconds&gt;,v1=&lt;hex(hmac_sha256(secret, "t.body"))&gt;
+            Stripe-uyumlu. Birden fazla v1 imzasi gelirse (rotation icin) hepsi denenir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.AuditController.Export(System.String,System.Nullable{System.DateTime},System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>
+            P2-#2 — Audit log CSV export. Tarih araligi (fromUtc..toUtc) verilirse o aralik;
+            shipmentRef verilirse sadece o gonderinin loglari; ikisi de yoksa son 30 gunun
+            tum tenant loglari (orchestrator-side filtre destegi olmadigi icin tenant tarama).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.BillingController">
+            <summary>
+            P4-#2 — Admin gozetimindeki aylik fatura listesi.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.BulkShipmentController">
+            <summary>
+            CSV ile toplu gonderi yukleme (P1-#9). Job CsvImportJobService uzerinde
+            arka planda calistirilir, sayfa progress + sonuclari gosterir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.CultureController">
+            <summary>
+            P2-#7 — Kullanici dil tercihini cookie'ye yazar (CookieRequestCultureProvider).
+            Desteklenen kulturler: tr (varsayilan), en. UseRequestLocalization middleware'i bu cookie'yi okur.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.EmbedController">
+             <summary>
+             P4-#3 — Iframe-friendly public tracker.
+            
+             Kullanim (musteri sitesinde):
+             <code>
+             &lt;iframe src="https://studio.kargoyeri.com/embed/track/ABC123XYZ"
+                     width="100%" height="520" style="border:0;border-radius:12px;"&gt;&lt;/iframe&gt;
+             </code>
+            
+             X-Frame-Options bu controller'in cevaplarinda kaldirilir; CSP frame-ancestors *
+             olarak ayarlanir (musteri kendi domain'inde embed edebilsin).
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.HomeController.CustomerIndexAsync(System.Threading.CancellationToken)">
+            <summary>
+            P3-#2 — Musteri kullanicilar icin sade, gorsel dashboard.
+            Admin'in detayli phase/checklist gorunumu yerine KPI + trend + son hareketler gosterir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.LegalController">
+            <summary>
+            KVKK aydinlatma metni, kullanim sartlari, cerez politikasi gibi
+            herkese acik yasal sayfalar.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.MetricsController">
+             <summary>
+             P2-#4 — Prometheus scrape edilebilir <c>/metrics</c> endpoint.
+            
+             Yayinlanan metrikler:
+               * kargoyeri_tenants_total                                         (gauge)
+               * kargoyeri_shipments_total{tenant,provider,status}              (gauge)
+               * kargoyeri_provider_health_success_rate{tenant,provider} 0..100 (gauge, 24h)
+               * kargoyeri_provider_health_p95_latency_ms{tenant,provider}     (gauge)
+               * kargoyeri_webhook_retry_pending                               (gauge)
+               * kargoyeri_webhook_retry_abandoned                             (gauge)
+               * kargoyeri_process_uptime_seconds                              (gauge)
+               * kargoyeri_process_memory_bytes                                (gauge)
+            
+             Auth: <c>Studio:Metrics:Token</c> set edildiyse <c>X-Metrics-Token</c>
+             header veya <c>?token=</c> query param zorunlu. Aksi halde acik (dev).
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.OnboardingController">
+            <summary>
+            P3-#5 — Tenant onboarding wizard.
+            Yeni musterilere kurulum akisini gorsel adimlarla anlatir:
+              1) Workspace - 2) API Key - 3) Test Gonderi - 4) Webhook
+            Her adim, ilgili sayfaya yonlendirir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.PickupController">
+            <summary>
+            Kurye/pickup randevu yonetimi. Operasyon ekibi musteriden gonderi alimi
+            (kurye cagrisi) icin randevu olusturur, durumu izler.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.ProviderCertificationController">
+             <summary>
+             P5-#6 — Provider canli sertifikasyon paneli.
+            
+             Adminin secili tenant + provider icin uctan uca sertifikasyon
+             (auth/create/refresh/cancel) calistirmasini saglar. Sonuclar
+             ContentRoot/provider-cert/ altinda JSON olarak saklanir.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.ProviderHealthController">
+             <summary>
+             Provider Saglik Panosu (P1-#8) — son 24 saat / 1 saat icindeki probe sonuclarinin
+             success rate, p95 latency ve son hata bilgisini tenant bazinda gosterir.
+            
+             Veri kaynagi: ProviderHealthMonitor — ProviderHealthProbeService tarafindan
+             her N dakikada bir doldurulur.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.RegionalHealthController">
+             <summary>
+             P4-#4 — Multi-region failover icin probe endpoint.
+            
+             Kullanim: bir yuksek-kullanilirlik load balancer (Cloudflare / Azure Front Door)
+             her region instance'a `GET /healthz/regional` isler. Donen JSON:
+             <code>
+             {
+               "region": "tr-west-1",
+               "instance": "studio-1.kargoyeri.local",
+               "version": "1.4.0",
+               "uptime_seconds": 3601,
+               "healthy": true,
+               "checks": [{ "name": "studio-storage", "status": "Healthy" }]
+             }
+             </code>
+            
+             Region/instance adlari konfig'den okunur:
+             <code>"Studio:Region:Code": "tr-west-1", "Studio:Region:Instance": "studio-1"</code>
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.SecurityController">
+            <summary>
+            Kullanicinin kendi hesabi uzerinde guvenlik ayarlarini yonetmesini saglar
+            (TOTP enrollment / disable). Admin'ler de kullanabilir, ama Admin rolu icin
+            tenantKey/username claim'leri olmadigi icin sadece kendi tenant kullanicilari icindir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.ShipmentsController.SubmitToCargo(System.String,Kargoyeri.Contracts.Enums.CargoProviderTypeDto,System.Threading.CancellationToken)">
+            <summary>
+            Müşteri arayüzü: mevcut Pending/Failed bir gönderiye kargo firması atar ve API'ye gönderir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.ShipmentsController.Archive(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Gonderiyi soft-delete (arsiv) eder. Veri silinmez; sadece
+            CargoShipment.Metadata["shipment.archived"] = "true" yazilir ve liste
+            ekraninda varsayilan olarak gizlenir. Yetkili kullanici "Arsivlenenleri Goster"
+            toggle'i ile geri getirebilir; Unarchive ile aktif duruma alabilir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.ShipmentsController.Unarchive(System.String,System.Threading.CancellationToken)">
+            <summary>Arsivlenmis bir gonderiyi tekrar aktif liste icine alir.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.SignupController">
+             <summary>
+             P5-#4 — Self-service signup akisi.
+            
+             Adimlar:
+               1) GET  /signup           -> form (firma adi, tam ad, e-posta, telefon, VKN)
+               2) POST /signup           -> PendingSignupStore'a yaz, dogrulama maili gonder
+               3) GET  /signup/check     -> "e-postani kontrol et" sayfasi
+               4) GET  /signup/confirm/{token} -> token'i dogrula, tenant olustur, /onboarding'e yonlendir
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.TenantSwitchController">
+            <summary>
+            Admin kullanıcısının müşterileri yönetmesini ve geçiş yapmasını sağlar.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.TenantSwitchController.StopImpersonation(System.Threading.CancellationToken)">
+            <summary>P2-#5 — Aktif impersonation'i sonlandirir, audit kaydi yazar.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.TenantSwitchController.RotateInboundSecret(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Kargo firmalarinin bizim sistemimize callback POST ettiginde header ile gonderecegi
+            shared secret'i uretir veya doner. Saklanir: Metadata["webhook.inbound.secret"].
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.TenantSwitchController.RotateLicense(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Mevcut lisans kodunu yeniden uretir — suresi ve plani korur, ama kod degisir.
+            Sizdirilma suphesi olan lisanslari gecersiz kilmak icin kullanilir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.TrackingController.BuildProgressSteps(Kargoyeri.Contracts.Enums.ShipmentStatusDto)">
+            <summary>
+            P3-#1 — Durum DTO'sundan 5-adimli gorsel cubuk veri yapisi uretir.
+            Adim sirasi: Hazirlandi -> Kargoda -> Yolda -> Dagitimda -> Teslim Edildi.
+            Cancelled/Failed durumda IsFailure=true ile cubuk kirmiziya doner.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Controllers.WebhookDeliveryController">
+            <summary>
+            P2-#3 — Outbound Webhook Delivery Dashboard.
+            Workspace bazinda son N webhook bildirimini gosterir; her satirda
+            otomatik retry kuyrugundaki deneme sayisi + sonraki deneme zamani gorunur.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Controllers.WebhookDeliveryController.RetryNow(System.Guid,System.Threading.CancellationToken)">
+            <summary>Manuel "simdi yeniden dene" — retry zamanlamasini sifirlar.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.BillingService">
+             <summary>
+             P4-#2 — Aylik kullanim faturalandirmasi.
+            
+             Konfig (appsettings.json):
+             <code>
+             "Studio": {
+               "Billing": {
+                 "Currency": "TRY",
+                 "Tier": {
+                   "MonthlyBaseFee": 199.00,
+                   "IncludedShipments": 250,
+                   "PricePerExtraShipment": 0.85,
+                   "VatPercent": 20
+                 }
+               }
+             }
+             </code>
+            
+             Veri kaynagi: TenantMetricsAggregator gunluk snapshot dosyalari.
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.BillingService.ComputeMonthAsync(System.Int32,System.Int32,System.Threading.CancellationToken)">
+            <summary>Computes a monthly invoice for the given (year, month).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.CancelPolicy">
+            <summary>
+            Gonderi iptal kurallari — Studio katmaninda tek noktadan tutulur.
+            Hangi durumdan iptal edilebilir, hangi provider iptali destekler.
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.CancelPolicy.CancellableStatuses">
+            <summary>Bu durumlarda iptal mantikli ve guvenli.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.CancelPolicy.NonCancellableStatuses">
+            <summary>Bu durumlarda iptal anlamsiz/imkansiz.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.CancelPolicy.UnsupportedProviders">
+            <summary>
+            Otomatik iptal API'si DESTEKLEMEYEN kargo firmalari.
+            Bu firmalarin gonderileri musteri panelinden / cagri merkezinden iptal edilir.
+            (PTT API iptal desteklemiyor; Trendyol Express paket iptali Seller Panel'den.)
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.CancelPolicy.GetUnsupportedReason(Kargoyeri.Contracts.Enums.CargoProviderTypeDto)">
+            <summary>UI'da kullanici bilgilendirme metni.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.CorrelationIdMiddleware">
+            <summary>
+            Her istek icin bir correlation ID uretir (veya gelen X-Correlation-ID header'ini alir),
+            loglarin bir request'i takip etmesi icin ILogger scope'una ve response header'ina ekler.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.CsvImportJobService">
+            <summary>
+            CSV dosyasini HTTP istegini bloklamadan arka planda isler.
+            Job durumu bellekten okunur; uygulama yeniden baslatilinca sifirlanir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.EInvoice.GibPortalEArchiveGateway">
+             <summary>
+             P5-#3 — GIB e-Arsiv portal entegrasyonu (skeleton).
+            
+             Not: GIB'in resmi e-Arsiv portali otomasyon API'si DESTEKLEMEZ. Mukellef sayisi az
+             kuruluslar icin GIB Internet Vergi Dairesi'nde manuel duzenleme yapilir.
+             Aylik fatura sayisi 5'i asanlar **ozel entegrator** (Korgun/Uyumsoft/Logo/Mikro/Foriba) kullanmalidir.
+            
+             Bu sinif GIB Portal entegrasyonunun **mantiken eksik** oldugunu isaretlemek icin var.
+             SubmitAsync hep "manuel issue" sonucu doner.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.EInvoice.IEArchiveGateway">
+             <summary>
+             P5-#3 — e-Arsiv / e-Fatura saglayicisi soyutlamasi.
+             Implementasyonlar: GibPortalEArchive, KorgunEArchive, UyumsoftEArchive, NoopEArchive (dev).
+            
+             Yasal not: TR'de aylik 5M+ ciro veya sektorel kapsamda kayitli mukellef e-Fatura/e-Arsiv kullanmali.
+             Aksi halde matbu fatura yeterli (ancak Studio musterileri B2B agirlikli — hepsi e-Fatura'ya tabi olabilir).
+             </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.EInvoice.IEArchiveGateway.Name">
+            <summary>Saglayici adi (orn: "gib", "korgun", "uyumsoft", "noop").</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.EInvoice.IEArchiveGateway.SubmitAsync(Kargoyeri.Studio.Core.Infrastructure.EInvoice.EArchiveDocument,System.Threading.CancellationToken)">
+            <summary>Fatura olusturup saglayiciya gonderir; UUID + PDF/HTML link doner.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.EInvoice.IEArchiveGateway.DownloadPdfAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Olusturulmus fatura PDF/HTML belgesini saglayicidan ceker.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.EInvoice.IEArchiveGateway.CancelAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Olusturulmus faturayi iptal eder (sure icindeyse — TR'de 8 gun).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.EInvoice.KorgunEArchiveGateway">
+             <summary>
+             P5-#3 — Korgun e-Arsiv (https://korgunmali.com / https://earsiv.korgun.com.tr) skeleton.
+            
+             Gercek API'leri Korgun'un sundugu REST endpoint'i. Bu skeleton:
+              - Bearer token auth ile JSON POST yapar
+              - Hata response'lerini logla
+              - PDF download API'sini cagirir
+            
+             Konfig:
+             <code>
+             "Studio:EArchive:Korgun": {
+               "BaseUrl": "https://api.korgun.com.tr",
+               "Username": "...",
+               "Password": "...",
+               "ApiKey": "...",
+               "SellerVkn": "1234567890",
+               "SellerTitle": "Kargoyeri Yazilim Tic. A.S."
+             }
+             </code>
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.EInvoice.NoopEArchiveGateway">
+            <summary>
+            P5-#3 — Dev/test ortami: gercek saglayici cagrilmaz, dosyaya log atar.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.EInvoice.UyumsoftEArchiveGateway">
+             <summary>
+             P5-#3 — Uyumsoft e-Arsiv (https://www.uyumsoft.com.tr) skeleton.
+            
+             Uyumsoft genelde SOAP servis kullanir; bu skeleton REST gateway varsayar.
+             Production: Uyumsoft'un sunculari icin kendi WSDL stub'unu generate edip,
+             burayi `BasicHttpsBinding` ile sarmalamak gerekebilir.
+            
+             Konfig:
+             <code>
+             "Studio:EArchive:Uyumsoft": {
+               "BaseUrl": "https://efatura.uyumsoft.com.tr/api",
+               "Username": "...",
+               "Password": "...",
+               "SellerVkn": "1234567890"
+             }
+             </code>
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.KvkkDeletionRequest">
+            <summary>
+            KVKK md. 7 — "Verilerimi Sil" talebinin tenant Metadata uzerinden saklanmasi.
+            JSON dosya modu ve SQL Server modu — ikisinde de calisir cunku Metadata bir
+            string-string sozlugudur (bkz. CustomerTenant.Metadata).
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KvkkDeletionRequest.GracePeriodDays">
+            <summary>30 gun bekleme suresi (KVKK md. 7 + DATA-RETENTION.md §3).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.KvkkDeletionRequest.ApplyRequest(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String,System.String)">
+            <summary>Yeni silme talebi olustur — pending durumunda.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.KvkkDeletionRequest.ApplyCancellation(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>Talebi iptal et — Metadata'dan tum kvkk.deletion.* anahtarlarini kaldirmak yerine
+            status=cancelled isaretler (denetim izi icin).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.KvkkDeletionRequest.ApplyApproval(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String)">
+            <summary>Admin onayi — hard-delete tarihini guncellemez (request sirasinda hesaplandi).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.LicenseGuardFilter">
+            <summary>
+            Her request'te musteri oturumunun lisansini kontrol eder. Suresi dolmussa
+            kullaniciyi logout edip /Access/Login'e "Lisansiniz doldu" mesajiyla yonlendirir.
+            Admin'i ve Access controller'i atlar.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.LicenseInfo">
+            <summary>
+            Müşteri lisans bilgisini Metadata dictionary'sinden okur/yazar.
+            Metadata key'leri: license.code, license.expiresAt, license.plan, license.createdAt
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.LicenseInfo.#ctor(System.String,System.Nullable{System.DateTimeOffset},System.String,System.Nullable{System.DateTimeOffset})">
+            <summary>
+            Müşteri lisans bilgisini Metadata dictionary'sinden okur/yazar.
+            Metadata key'leri: license.code, license.expiresAt, license.plan, license.createdAt
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.LicenseHelper.GenerateCode">
+            <summary>
+            Rastgele KY-XXXX-XXXX-XXXX formatında lisans kodu üretir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.MarketplaceOrderSyncEngine.GenerateShipmentReference(System.String,System.Nullable{Kargoyeri.Domain.Enums.OrderSourceChannel})">
+            <summary>
+            Sistem-ici shipment referansi uretir; kanal prefix'iyle disambigue eder.
+            Ornek: "KY-ACME-TY-20260511143022-a1b2c3d4" (Trendyol).
+            channel=null => "API" prefix'i ile generic (yalnizca kanal cozulemediyse).
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.MarketplaceOrderSyncEngine.TryMapToChannel(Kargoyeri.Studio.Core.Infrastructure.MarketplaceWorkspaceSettings)">
+            <summary>
+            Generic <see cref="T:Kargoyeri.Studio.Core.Infrastructure.MarketplaceWorkspaceSettings"/> alanlarini (ApiKey/ApiSecret/StoreId/...)
+            her bir kanal'in IOrderChannelAdapter implementasyonunun beklediği descriptor field key'lerine map eder.
+            Amazon (4 ayrı credential) gibi karmasik durumlar map disinda — generic HTTP yoluna duser.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.MarketplaceOrderSyncEngine.ResolveSourceChannel(System.String,System.Nullable{Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelType})">
+            <summary>
+            Hangi spesifik kanaldan geldigini netlestir.
+            Live adapter bridge'i icin <paramref name="adapterChannel"/> dolu gelir;
+            legacy HTTP yolundan gelen siparisler icin <paramref name="platformText"/>
+            (settings.Platform — "Trendyol", "Hepsiburada", ...) string match'i kullanilir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.AmazonLiveAdapter">
+            <summary>
+            Amazon SP-API (Selling Partner) — canli iskelet adapter.
+            Docs: https://developer-docs.amazon.com/sp-api
+            Akis: 1) LWA refresh -> access token (api.amazon.com/auth/o2/token)
+                  2) GET sellingpartnerapi-eu.amazon.com/orders/v0/orders
+            Not: AWS SigV4 imzasi olmadan SP-API access token tek basina yeterli olabiliyor (yeni RDT/grantless flow);
+                 restricted operasyonlar icin RDT gerekir. Bu adapter listeleme operasyonu icin yeterli.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.CicekSepetiLiveAdapter">
+            <summary>
+            Cicek Sepeti Marketplace API (canli).
+            Docs:    https://apidocs.ciceksepeti.com
+            Endpoint: POST https://apis.ciceksepeti.com/api/v1/Order/GetOrders
+            Auth:    Header "x-api-key: {apiKey}"
+            Body:    { startDate, endDate, pageSize, pageNumber }
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.HepsiburadaLiveAdapter">
+            <summary>
+            Hepsiburada Marketplace OMS API (gercek/canli).
+            Docs: https://developers.hepsiburada.com/hepsiburada/reference/get_packages-merchantid-merchantid
+            Endpoint:  GET https://oms-external.hepsiburada.com/packages/merchantid/{merchantId}
+            Auth:      Basic Auth -> base64(username:password)  (panel uyesi degil; entegrasyon kullanicisi)
+            User-Agent: "{merchantId} - SelfIntegration" (zorunlu)
+            Date:      ISO 8601 (begindate / enddate)
+            HB siparisleri "package" (paket) olarak dondurur — biz bunu RawIncomingOrder'a cevirirken
+            packageNumber'i ChannelExternalOrderId yapariz.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.IdeaSoftLiveAdapter">
+            <summary>
+            IdeaSoft REST API (gercek/canli).
+            Docs:     https://developer.ideasoft.com.tr
+            Endpoint: GET (storeUrl)/api/orders?sinceId=... + dateMin=YYYY-MM-DD
+            Auth:     OAuth2 Client Credentials -> POST /oauth/v2/token (grantType=clientCredentials)
+                      -> Bearer (accessToken)
+            Rate:     60 req/min (token bucket)
+            Not:      Token TTL ~3600s; cache'lenir (per-tenant in-memory)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.ModanisaLiveAdapter">
+            <summary>
+            Modanisa Marketplace API — canli iskelet.
+            Public dokuman yok; anlasmali saticilara acilan REST endpoint kullanilir.
+            Endpoint:  GET https://api.modanisa.com/marketplace/orders
+            Auth:      Basic Auth -> base64(apiKey:apiSecret) + Header "X-Seller-Id"
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.N11LiveAdapter">
+            <summary>
+            N11 Marketplace SOAP API (gercek/canli).
+            WSDL: https://api.n11.com/ws/OrderService.wsdl
+            Endpoint: POST https://api.n11.com/ws/OrderService.wsdl
+            Auth:   SOAP envelope icinde &lt;auth&gt;&lt;appKey&gt;...&lt;/appKey&gt;&lt;appSecret&gt;...&lt;/appSecret&gt;&lt;/auth&gt;
+            Operasyon: OrderList (status: New|Approved|Shipped|Delivered|Completed|Claimed|LATE_SHIPMENT|Rejected)
+            Rate: 1000 req/dk; DetailedOrderList icin 5sn aralik
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.NopCommerceLiveAdapter">
+            <summary>
+            NopCommerce Inroen Product API.
+            Swagger: POST /api/auth/login, GET /api/orders, GET /api/orders/{id}
+            Auth: Bearer accessToken veya X-Api-Key.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.PazaramaLiveAdapter">
+            <summary>
+            Pazarama Marketplace API (canli).
+            Docs:    https://isortagim.pazarama.com/developers
+            Endpoint: GET https://isortagimapi.pazarama.com/orders (startDate, endDate, page, size query)
+            Auth:    Basic Auth -> base64(clientId:clientSecret)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.PttAvmLiveAdapter">
+            <summary>
+            PttAVM Marketplace API — canli iskelet.
+            Public dokuman sinirli; satici anlasmasiyla acilan REST endpoint kullanilir.
+            Endpoint:  GET https://ptt-pubsubapi.pttavm.com/Marketplace/order/list
+            Auth:      Header "X-Api-Key: {apiKey}" + Header "X-Seller-Id: {sellerId}"
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.ShopifyLiveAdapter">
+            <summary>
+            Shopify Admin REST API (gercek/canli).
+            Docs:     https://shopify.dev/docs/api/admin-rest/2024-10/resources/order
+            Endpoint: GET https://{shop}.myshopify.com/admin/api/{version}/orders.json
+            Auth:     X-Shopify-Access-Token header
+            Filter:   updated_at_min=ISO8601 + status=any (varsayilan open siparisleri kacirmamak icin)
+            Rate:     2 req/s (bucket-based, Retry-After header'i takip eder)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.SimulationOrderChannelAdapterBase">
+            <summary>
+            Tum simulasyon-modlu adapter'lar icin ortak base.
+            Gercek API hazir olunca turetmis sinif override eder.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.EmbeddedShopOrderChannelAdapter">
+            <summary>
+            Gomulu mini-shop — proje henuz hazir degil. Her zaman "yakinda" doner.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.TicimaxLiveAdapter">
+            <summary>
+            Ticimax REST API (gercek/canli).
+            Docs:     https://ticimax.com.tr/destek-merkezi (API Documentation)
+            Endpoint: GET {siteUrl}/Servis/SiparisServis.svc/JSON/SiparisListesi
+                      POST body: { ApiKey, SiparisFiltre: { BaslangicTarihi, BitisTarihi, ... } }
+            Auth:     API Key (panel'den olusturulur) — body parametresi olarak gonderilir
+            Format:   Ticimax JSON RPC tarzi — POST + JSON envelope
+            Rate:     Genelde host-bagimli (kendi sunucusunda calistigi icin)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.TrendyolLiveAdapter">
+            <summary>
+            Trendyol Seller API (gercek/canli).
+            Docs: https://developers.trendyol.com/v3.0/docs/2-order-integration-api-endpoints
+            Endpoint:  GET https://apigw.trendyol.com/integration/order/sellers/{supplierId}/orders
+            Auth:      Basic Auth -> base64(apiKey:apiSecret)
+            User-Agent: "{supplierId} - SelfIntegration" (zorunlu)
+            Date:      Unix epoch milisaniye (max 14 gunluk pencere)
+            Rate:      ~1000 req/dk
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.Adapters.WooCommerceLiveAdapter">
+            <summary>
+            WooCommerce REST API v3 (gercek/canli).
+            Docs:     https://woocommerce.github.io/woocommerce-rest-api-docs/
+            Endpoint: GET (siteUrl)/wp-json/wc/v3/orders?after=ISO8601 + per page=100
+            Auth:     Basic Auth — consumerKey/consumerSecret (HTTPS uzerinde)
+                      HTTP icin: query string (consumer key/secret) — onerilmez
+            Rate:     WordPress host-bagimli, varsayilan limit yok
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.IOrderChannelAdapter">
+            <summary>
+            Bir order channel'in (Hepsiburada, Trendyol, NopCommerce, ...)
+            fetch + connect-test contract'i.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.IOrderChannelAdapter.TestConnectionAsync(Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelCredentials,System.Threading.CancellationToken)">
+            <summary>API erisilebilir mi? Credential dogru mu?</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.IOrderChannelAdapter.FetchOrdersAsync(Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelCredentials,System.DateTimeOffset,System.Threading.CancellationToken)">
+            <summary>
+            Verilen tarihten sonra olusan siparisleri ceker. Her satir RawIncomingOrder.
+            Idempotent olmali — caller ChannelExternalOrderId'ye gore dedup eder.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.RawIncomingOrder">
+            <summary>
+            Channel-bagimsiz ham siparis. SyncEngine bunu CargoShipment'a cevirir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.RawIncomingOrder.#ctor(Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelType,System.String,System.String,System.DateTimeOffset,System.Nullable{System.Decimal},System.String,Kargoyeri.Studio.Core.Infrastructure.OrderChannels.RawAddress,System.Collections.Generic.IReadOnlyList{Kargoyeri.Studio.Core.Infrastructure.OrderChannels.RawOrderItem},System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>
+            Channel-bagimsiz ham siparis. SyncEngine bunu CargoShipment'a cevirir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelDescriptor">
+            <summary>
+            Bir order channel'in UI ve credential semasi tanimi.
+            Her channel kendi alan setini (apiKey, apiSecret, supplierId, ...) bildirir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelDescriptor.#ctor(Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelType,System.String,System.String,System.String,System.String,Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelStage,System.Collections.Generic.IReadOnlyList{Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelField},System.String)">
+            <summary>
+            Bir order channel'in UI ve credential semasi tanimi.
+            Her channel kendi alan setini (apiKey, apiSecret, supplierId, ...) bildirir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelCatalog">
+            <summary>
+            Tum desteklenen channel'lerin merkezi katalog tanimi.
+            Yeni bir channel eklemek icin sadece buraya yeni descriptor + adapter implementasyonu eklemek yeterlidir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelState">
+            <summary>
+            Per-channel metadata namespace: "channel.{code}.{field}".
+            Ornk: channel.hepsiburada.merchantId, channel.trendyol.apiKey
+            Ek alanlar:
+              channel.{code}.enabled        — bool
+              channel.{code}.lastSyncUtc    — ISO timestamp (son basarili sync)
+              channel.{code}.defaultProvider — kargo firmasi kodu (siparis cekildiginde varsayilan)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelRegistry">
+            <summary>
+            DI'a kayitli tum IOrderChannelAdapter implementasyonlarini channel type'a gore arar.
+            Her channel icin tek bir adapter olur.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncEngine">
+             <summary>
+             Multi-channel sipariş ingestion orkestratoru — CANLI.
+             CustomerProfile.Metadata'dan aktif kanallari okur, her birinin adapter'ini cagirir,
+             donen RawIncomingOrder'lari shipment-creation pipeline'a aktarir.
+            
+             MarketplaceOrderSyncEngine ile paralel calisir: bu engine multi-channel (yeni)
+             metadata namespace'inden (channel.{code}.{field}) cekilenleri yonetir.
+             Idempotency, adres dogrulama, anomali tespiti dahil tum production akisi var.
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncEngine.GenerateShipmentReference(System.String,Kargoyeri.Domain.Enums.OrderSourceChannel)">
+            <summary>
+            Sistem-ici shipment referansi: kanal prefix'i ile disambigue (ornek: KY-ACME-ET-SHP-...).
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncRun.ImportedCount">
+            <summary>Bu sync run sirasinda gercekten DB'ye kaydedilen yeni shipment sayisi.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncRun.SkippedCount">
+            <summary>Idempotency dolayisiyla atlanan (zaten kayitli) shipment sayisi.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncMonitor">
+            <summary>
+            Son N sync run'i in-memory tutar (UI'da gostermek icin).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelType">
+            <summary>
+            Bir musterinin sipariş kaynağı olarak ekleyebileceği kanallar.
+            3 ana senaryo: Marketplace API'leri, NopCommerce, gomulu mini-shop.
+            Manuel giris kanal sayilmaz; her zaman aktiftir.
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelStage.Live">
+            <summary>API entegrasyonu canli ve kullanima hazir.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelStage.Simulation">
+            <summary>API kontrati var ama simulasyon modunda — gercek istek atmaz.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelStage.ComingSoon">
+            <summary>UI hazir, backend onceki bir surumde gelecek.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.OutboundWebhookRetryQueue">
+            <summary>
+            P2-#3 — Basarisiz outbound webhook (notification) gonderimleri icin
+            exponential-backoff zamanlayici. NotificationService.RetryAsync ile
+            birlikte calisir. Durum bellekte tutulur, JSONL'a yazilir; restart sonrasi
+            son 7 gun rehidre edilir.
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.OutboundWebhookRetryQueue.BackoffSchedule">
+            <summary>1m, 5m, 15m, 1h, 6h, 24h — toplam ~31 saat.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OutboundWebhookRetryQueue.TrackFailure(System.Guid,System.String,System.DateTimeOffset,System.String)">
+            <summary>
+            Verilen Failed notification icin ilk kez state olustur.
+            Zaten varsa sessizce gec.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.OutboundWebhookRetryQueue.RecordAttempt(System.Guid,System.Boolean,System.String)">
+            <summary>Bir retry denemesinin sonucunu kaydeder.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Payments.IPaymentGateway">
+            <summary>
+            P5-#3 — Tahsilat saglayicisi soyutlamasi.
+            Implementasyonlar: IyzicoPaymentGateway, ParamPaymentGateway, PayTrPaymentGateway, NoopPaymentGateway (dev).
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.Payments.IPaymentGateway.Name">
+            <summary>Saglayici adi (orn: "iyzico", "param", "paytr", "noop").</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Payments.IPaymentGateway.InitiateAsync(Kargoyeri.Studio.Core.Infrastructure.Payments.PaymentRequest,System.Threading.CancellationToken)">
+            <summary>3D-Secure baslatir; kullaniciya yonlendirilecek HTML/URL doner.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Payments.IPaymentGateway.HandleCallbackAsync(System.Collections.Generic.IDictionary{System.String,System.String},System.Threading.CancellationToken)">
+            <summary>Saglayicidan donen callback'i dogrular (HMAC/imza), odeme durumunu cozer.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Payments.IPaymentGateway.RefundAsync(System.String,System.Decimal,System.String,System.Threading.CancellationToken)">
+            <summary>Iade (full/partial). Provider destekliyorsa.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Payments.IyzicoPaymentGateway">
+             <summary>
+             P5-#3 — Iyzico (https://www.iyzico.com) odeme entegrasyonu (skeleton).
+            
+             Gercek REST imzalama mantigi (PKI v2): authorization string PKI formatinda HMAC-SHA256.
+             Bu skeleton SADECE dogru imza algoritmasini gosterir; Iyzico SDK'nin yerini almaz.
+             Production icin: <c>Iyzipay</c> NuGet paketini ekleyip resmi client ile sarmalayin.
+            
+             Konfig:
+             <code>
+             "Studio:Payments:Iyzico": {
+               "ApiKey": "sandbox-...",
+               "SecretKey": "sandbox-...",
+               "BaseUrl": "https://sandbox-api.iyzipay.com"
+             }
+             </code>
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Payments.IyzicoPaymentGateway.BuildAuthHeader(System.String,System.String)">
+            <summary>Iyzico PKI v1 imzalama (basit). Production'da v2 (HMACSHA256) tercih edilmeli.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Payments.NoopPaymentGateway">
+            <summary>
+            P5-#3 — Dev/test ortami icin: hicbir odeme yapmaz, hep "basarili" doner.
+            Production'da KULLANILMAZ.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.PendingSignupStore">
+            <summary>
+            P5-#4 — Self-service signup icin bekleyen kayit havuzu.
+            E-posta dogrulanana kadar tenant gercekten olusturulmaz.
+            JSON dosyasi tabanli (basit, bolgeler-arasi senk degil — P5-#8'de S3 backend ile esitlenecek).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.PersistentStudioActivityLogService">
+            <summary>
+            Ring buffer + disk persistence. JSONL formatinda gunluk dosyalar yazar
+            (activity-yyyyMMdd.jsonl). Uygulama yeniden baslatildiginda son 2 gunun
+            kayitlarini hafizaya geri yukler. Arka planda channel uzerinden yazarak
+            request path'inde IO bloklamaz.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.PersistentStudioActivityLogService.RehydrateFromDisk">
+            <summary>Diskteki son N gunun dosyalarini hafizaya yukler.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.PickupRequestService">
+            <summary>
+            Kurye/pickup randevularini tenant Metadata["pickups"] anahtarinda JSON olarak saklar.
+            Boylece mevcut storage (JSON file / SQL Server) ile otomatik persist olur.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.PickupRequestService.CountActive(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>Profile zaten yuklenmisken hizli sayim.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.PickupStatus">
+            <summary>Pickup durumlari.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.PrometheusTextWriter">
+            <summary>
+            P2-#4 — Prometheus text exposition format (v0.0.4) icin kucuk yardimci.
+            NuGet bagimliligi olmadan minimal counter/gauge yazimi saglar.
+            Spec: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.ProviderCertificationRunner">
+             <summary>
+             P5-#6 â€” Provider canli sertifikasyon runner.
+            
+             Her saglayici icin uctan uca akisi calistirir:
+               1) Auth/Settings dogrulama  (credential bulunabiliyor mu?)
+               2) CreateShipment           (test gonderi olustur)
+               3) RefreshStatus            (statu sorgula)
+               4) CancelShipment           (test gonderiyi iptal et)
+            
+             Her step duration + success/fail + provider message kaydedilir.
+             Sonuc JSON file'da `provider-cert/yyyy-MM-dd/{tenantKey}-{provider}.json` saklanir.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioProviderStatusService">
+            <summary>
+            Studio'ya ozel provider durum servisi.
+            Kargoyeri.Application.Services.ProviderIntegrationStatusService ile cakismamasi icin
+            bu wrapper kullanilmaktadir; arka planda ayni Contracts.Dtos.ProviderIntegrationStatusDto'yu dondurur.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier">
+            <summary>
+            Kargoyeri'nin standart servis seviyeleri. Provider-bagimsizdir; her sagiyici
+            kendi koduna <see cref="T:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog"/> uzerinden cevirir.
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier.Standard">
+            <summary>Standart kara teslimat (1-3 is gunu).</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier.Express">
+            <summary>Hizli teslimat (1-2 is gunu).</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier.SameDay">
+            <summary>Ayni gun teslimat (sehir ici).</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier.NextDay">
+            <summary>Ertesi gun teslimat.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier.Economy">
+            <summary>Ekonomik (agir/buyuk yuk, daha yavas).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog">
+            <summary>
+            Provider × tier → (metadata key, value, display) mapping katalogu.
+            Studio bir gonderi olusturulurken UI'dan gelen tier'i provider'in
+            kendi metadata anahtar/degerine ceviren tek noktadir.
+            </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.Mappings">
+            <summary>
+            Provider × tier eslestirme tablosu.
+            Provider DLL'leri zaten bu metadata key'leri okuyor; biz sadece UI'dan gelen tier'i
+            dogru anahtar/degere ceviriyoruz.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.GetTiersFor(Kargoyeri.Contracts.Enums.CargoProviderTypeDto)">
+            <summary>Bir provider icin desteklenen tier'lari dondurur.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.Resolve(Kargoyeri.Contracts.Enums.CargoProviderTypeDto,Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier)">
+            <summary>Provider+tier kombinasyonu icin mapping; eslesme yoksa null.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.GetDefault(Kargoyeri.Contracts.Enums.CargoProviderTypeDto)">
+            <summary>Provider icin default tier mapping; her provider icin Standard tanimlidir.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.Apply(System.Collections.Generic.Dictionary{System.String,System.String},Kargoyeri.Contracts.Enums.CargoProviderTypeDto,Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier)">
+            <summary>
+            Provider+tier'a karsilik gelen metadata key/value'yu metadata sozlugune yazar.
+            Eslesme yoksa hicbir sey yapmaz (no-op) — varsayilan provider davranisi devreye girer.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.ParseFromMetadata(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>
+            Metadata icindeki "kargoyeri.serviceTier" anahtarindan tier'i parse eder.
+            Yoksa Standard.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ServiceTypeCatalog.GetDisplayName(Kargoyeri.Studio.Core.Infrastructure.KargoyeriServiceTier)">
+            <summary>UI'da tier kullanici dostu Turkce ad.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.ShipmentArchiveIndex">
+             <summary>
+             P2-#6 — Soft-delete edilmis (arsivlenmis) gonderilerin tenant bazinda
+             in-memory indeksi. Liste ekraninda DB-paged sonuclari arsivlenmis kayitlardan
+             hizlica filtrelemek icin kullanilir.
+            
+             Arsiv durumu CargoShipment.Metadata["shipment.archived"] = "true" olarak
+             kalici saklanir; bu indeks sadece okuma cache'idir, yazimda repo guncellenir.
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ShipmentArchiveIndex.GetAsync(Kargoyeri.Application.Abstractions.Persistence.IShipmentRepository,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Tenant icin arsivlenmis shipment referans setini doner.
+            Cache'de yoksa repodan yukler.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.ShipmentArchiveIndex.ReloadAsync(Kargoyeri.Application.Abstractions.Persistence.IShipmentRepository,System.String,System.Threading.CancellationToken)">
+            <summary>Tenant'in arsiv setini repodan yeniden yukler.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Storage.AzureBlobStorage">
+             <summary>
+             Azure Blob Storage backend SKELETON.
+             Production deployment'inda Azure.Storage.Blobs NuGet paketi eklenip swap edilmeli.
+            
+             Bu skeleton local FS'e dusuyor — config'de "Azure" secildiginde uyari logluyor.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage">
+             <summary>
+             P5-#8 — Plug-in storage backend abstraction.
+            
+             Mevcut sistemde tenant metrics, label PDFs, audit exports, signup pending vb.
+             hep ContentRoot altinda dosya olarak yaziyor. Bu yaklasim multi-region/multi-instance
+             senaryolarda problem (her instance'in local FS'i farkli).
+            
+             IBlobStorage soyutlamasi:
+               - LocalFileBlobStorage  : default, ContentRoot/blobs/ altinda yazar (dev + tek-instance prod)
+               - S3BlobStorage         : AWS S3 / DigitalOcean Spaces / MinIO uyumlu (production multi-region)
+               - AzureBlobStorage      : Azure Blob Storage (Azure deployment'i icin)
+            
+             Backend secimi `Studio:Storage:Provider` config keyi ile yapilir:
+               - "Local"  -> LocalFileBlobStorage (default)
+               - "S3"     -> S3BlobStorage (Studio:Storage:S3:* gerekli)
+               - "Azure"  -> AzureBlobStorage (Studio:Storage:Azure:ConnectionString gerekli)
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.PutAsync(System.String,System.String,System.ReadOnlyMemory{System.Byte},System.String,System.Threading.CancellationToken)">
+            <summary>
+            Bir blob'u yazar. Mevcut blob varsa uzerine yazar.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.PutStreamAsync(System.String,System.String,System.IO.Stream,System.String,System.Threading.CancellationToken)">
+            <summary>Stream tabanli yazma — buyuk dosyalar icin.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.GetAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Blob'u byte array olarak okur. Yoksa null doner.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.GetStreamAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Blob'u stream olarak okur. Yoksa null doner. Caller dispose eder.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.ExistsAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Blob var mi?</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.DeleteAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Blob'u siler. Yoksa false doner.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.ListAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Container'daki anahtarlari listeler (prefix ile filtrelenebilir).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.Storage.IBlobStorage.GetPresignedUrlAsync(System.String,System.String,System.TimeSpan,System.Threading.CancellationToken)">
+            <summary>Pre-signed URL uretir (sadece public erisim destekleyen backend'lerde S3/Azure).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Storage.LocalFileBlobStorage">
+            <summary>
+            Local filesystem backend. ContentRoot/blobs/{container}/{key} altinda yazar.
+            Dev + tek-instance prod icin uygundur.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.Storage.S3BlobStorage">
+             <summary>
+             AWS S3 + S3-compatible (MinIO, DigitalOcean Spaces, Wasabi, Cloudflare R2) backend.
+            
+             AWS SDK (AWSSDK.S3) yerine kucuk bir Signature V4 implementasyonu â€” boylece extra
+             dependency yok. Production icin AWSSDK kullanmak istersen, bu sinifi swap edebilirsin.
+            
+             Konfig:
+               Studio:Storage:S3:Endpoint       (https://s3.us-east-1.amazonaws.com)
+               Studio:Storage:S3:Region         (us-east-1)
+               Studio:Storage:S3:AccessKey      (AKIA... veya MinIO root key)
+               Studio:Storage:S3:SecretKey      (...)
+               Studio:Storage:S3:Bucket         (kargoyeri-studio-prod)
+               Studio:Storage:S3:UsePathStyle   (true MinIO/R2, false AWS classic)
+             </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAccessOptions.OperatorAccessCode">
+            <summary>
+            Eski tek-operator kodu (geriye dönük uyumluluk — LockedWorkspaceCode ile birlikte çalışır).
+            Yeni müşteriler için CustomerCodes kullanın.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAccessOptions.CustomerCodes">
+            <summary>
+            Her müşteriye özel erişim kodu.
+            Key = erişim kodu, Value = TenantKey (müşteri kodu).
+            Müşteri bu kodla giriş yapınca otomatik olarak kendi workspace'ine kilitlenir.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAccessOptions.Admins">
+            <summary>
+            Sistem yoneticileri (e-posta + parola ile giris).
+            Production'da PasswordHash (BCrypt) kullanin; Password alani sadece dev/bootstrap icindir.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAdminUser.Password">
+            <summary>Plaintext parola (yalnizca bootstrap/dev icin onerilir).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAdminUser.PasswordHash">
+            <summary>BCrypt hash (production icin tercih edilir).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Infrastructure.StudioAdminUser.Role">
+            <summary>Admin or SuperAdmin. Defaults to the restricted Admin role.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioActivityLogFilter">
+            <summary>
+            Her MVC aksiyonunu otomatik olarak aktivite loguna kaydeder.
+            Login/Logout ve statik dosya istekleri hariç tutulur.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.InMemoryStudioActivityLogService">
+            <summary>
+            Ring buffer — en fazla <see cref="F:Kargoyeri.Studio.Core.Infrastructure.InMemoryStudioActivityLogService.Capacity"/> kayıt tutar, eskiler düşer.
+            Uygulama yeniden başlatılırsa kayıtlar sıfırlanır (in-memory).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioApiKeyMiddleware">
+             <summary>
+             /api/* rotalarini API key ile korur.
+             Header: X-Api-Key: {key}
+            
+             Auth kaynaklari (sirayla):
+               1) Global key — appsettings StudioApi:ApiKey (tum tenant'lar icin gecerli)
+               2) Tenant-bound key — TenantApiKeyStore (tenant.Metadata["api.keys"]).
+                  Bu durumda HttpContext.Items["studio:api-tenantKey"] tenant'a yazilir,
+                  controller'lar bu degeri okuyabilir.
+            
+             Her iki anahtar da bos/tanimsizsa (development) gecirir.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioApiKeyMiddlewareExtensions">
+            <summary>
+            Middleware kayit extension metodu.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioApiKeyOptions">
+            <summary>
+            REST API erisimi icin API key yapilandirmasi.
+            appsettings.json'da "StudioApi:ApiKey" olarak tanimlanir.
+            Bos birakilirsa API anonim erisime acik kalir (development icin).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.IStudioEmailSender">
+            <summary>
+            Sistem-ici e-posta gonderimi (sifre sifirlama, yeni kullanici davet, lisans uyarisi).
+            Mevcut SmtpOptions'i kullanir; CompositeNotificationDispatcher ile ayni SMTP konfigine baglanir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioFlash">
+            <summary>
+            Controller'lardan TempData'ya tipli flash mesaj yazmak icin helper.
+            Layout'ta tipi (success/error/warning/info) pill rengini belirler.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.StudioTenantRepositoryHealthCheck">
+            <summary>
+            Tenant deposu (JSON veya SQL) kolay bir okuma yapabiliyor mu diye kontrol eder.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.IStudioWorkspaceContext">
+            <summary>
+            Single-workspace compatibility adapter. The persisted TenantKey remains in the
+            current storage schema so existing customer data is not deleted by this change.
+            All interactive Studio users resolve to the same workspace.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore">
+             <summary>
+             Tenant bazli API anahtarlarini tenant Metadata["api.keys"] JSON dizisinde saklar (P1-#4).
+            
+             Format:
+               tenant.Metadata["api.keys"] = JSON Array of:
+                 { "id": guid, "name": "Test Anahtari", "hash": "sha256-hex", "prefix": "kgy_xxx",
+                   "createdAt": iso, "lastUsedAt": iso?, "isRevoked": bool }
+            
+             Plain anahtar yalnizca olusturuldugu anda kullaniciya gosterilir; sonra sadece hash saklanir.
+             </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.PreviewPrefixLen">
+            <summary>Plain anahtarin gorunen prefix uzunlugu (UI'da listelerken).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.GenerateResult">
+            <summary>Yeni anahtar uretir — donen GenerateResult plain anahtari icerir (yalniz bu donus iliskiyi gorur).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.GenerateResult.#ctor(System.Collections.Generic.Dictionary{System.String,System.String},Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.ApiKeyRecord,System.String)">
+            <summary>Yeni anahtar uretir — donen GenerateResult plain anahtari icerir (yalniz bu donus iliskiyi gorur).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.TryMatch(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String)">
+            <summary>Plain anahtarin hash'inin verilen tenant icindeki revoke edilmemis bir kayit ile eslesip eslesmedigini kontrol eder.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantApiKeyStore.TouchLastUsed(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.String)">
+            <summary>"LastUsedAt" alanini guncelle — middleware her dogrulamada cagirir.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator">
+             <summary>
+             P4-#1 — Gunluk tenant metrik rollup'i.
+            
+             Her tenant icin gunluk olarak:
+               * total shipment count
+               * by-status count map
+               * by-provider count map
+               * delivered count (o gun teslim edilen)
+            
+             JSON dosyalari `tenant-metrics/yyyy-MM-dd.json` altinda saklanir.
+             Bu dosyalar billing (P4-#2) ve analytics icin kullanilir.
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator.ComputeTodayAsync(System.Threading.CancellationToken)">
+            <summary>Computes today's snapshot in-memory (idempotent, can be called repeatedly).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator.PersistAsync(System.DateOnly,System.Collections.Generic.IReadOnlyList{Kargoyeri.Studio.Core.Infrastructure.TenantDailyMetrics},System.Threading.CancellationToken)">
+            <summary>Persists a snapshot to disk. Overwrites existing same-day file.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator.LoadAsync(System.DateOnly,System.Threading.CancellationToken)">
+            <summary>Loads a snapshot from disk; returns empty if missing.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator.ListPersistedDates">
+            <summary>Lists which dates have persisted snapshots, descending.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsAggregator.AggregateRangeAsync(System.DateOnly,System.DateOnly,System.Threading.CancellationToken)">
+            <summary>Aggregates a date range (for billing). Inclusive on both ends.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantMetricsHostedService">
+            <summary>
+            P4-#1 — Her gun yerel saat 00:30'da bir onceki gunun snapshot'ini diske yazar.
+            Ilk acilis: hemen bugunun (kismi) snapshot'ini yazar.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantUserService">
+            <summary>
+            Müşteri başına kullanıcıları CustomerTenant.Metadata["users"] anahtarında
+            JSON olarak saklar. Böylece mevcut storage (JSON/SQL) ile persist olur.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.ValidateAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Kullaniciyi dogrular. Eski SHA256 hash ile eslesirse otomatik olarak BCrypt'e upgrade eder.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.IssueResetTokenAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Admin tarafindan tetiklenir. Token uretip hash'ini saklar; duz token geri dondurulur.
+            Admin bunu kullaniciya iletir (sifreyi sifirlamak icin kullanilacak).
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.ResetPasswordAsync(System.String,System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Kullanici sifresini yeni degeri ile degistirir. Token gecerli ve suresi dolmamis olmalidir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.BeginTotpEnrollmentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Kullanici icin yeni bir TOTP secret uretir ama henuz aktif etmez.
+            Kullanici authenticator app ile kodu girip dogrulayana kadar TotpEnabled=false.
+            otpauth URI dondurulur — UI tarafinda QR koduna donusturulur.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.ConfirmTotpEnrollmentAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Kullanicinin enrollment sirasinda girdigi kodu dogrular ve TotpEnabled=true yapar.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.VerifyTotp(Kargoyeri.Studio.Core.Infrastructure.TenantUser,System.String)">
+            <summary>Login sirasinda 2.faktor dogrulamasi yapar.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.DisableTotpAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>2FA'yi kapatir ve secret'i temizler.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.CountUsers(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Async DB çağrısı yapmadan metadata'dan kullanıcı sayısını döner.
+            BuildViewModelAsync gibi zaten yüklenmiş profile sahip yerlerde kullanılır.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TenantUserService.IsLegacyHash(System.String)">
+            <summary>Hash formati SHA256 (eski) mi BCrypt (yeni) mi.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TenantUserRoles">
+            <summary>
+            Tenant kullanicisi icin granular rol. Admin rolu tenant disidir (StudioRoles.Admin).
+            Tenant ici roller:
+              ReadOnly → sadece okuma (liste/detay)
+              Operator → olusturma + duzenleme (varsayilan)
+              Manager  → Operator + kullanici yonetimi + lisans okuma (tenant ici yonetici)
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TotpAuthenticator">
+            <summary>
+            RFC 6238 TOTP (HMAC-SHA1, 30 sn pencere, 6 hane) implementasyonu.
+            Google Authenticator, Microsoft Authenticator, Authy gibi standart uygulamalarla uyumludur.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TotpAuthenticator.GenerateSecret">
+            <summary>Yeni rastgele Base32 kodlanmis secret uretir (160 bit).</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TotpAuthenticator.BuildProvisioningUri(System.String,System.String,System.String)">
+            <summary>otpauth:// URI uretir — QR kod kutuphanesi ile QR'a donusturulebilir.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TotpAuthenticator.Verify(System.String,System.String)">
+            <summary>
+            Verilen kodu mevcut zaman penceresine ve ±1 step toleransa karsi dogrular.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TrackingLookupService">
+            <summary>
+            Public tracking sayfasi icin tracking number → (tenant, shipment) cozumlemesi yapar.
+            Tum tenant'lari tarar (V1 brute force). Sonuclar kisa sureli cache'lenir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.TrackingNumberIndex">
+             <summary>
+             Tracking number → (tenantKey, shipmentReference) singleton in-memory indeksi (P1-#5).
+            
+             V1'de tum tenant'lar tarniyordu — O(tenant * shipment). Bu indeks lookup'i
+             O(1) yapar. Background timer ile her 5 dk yenilenir; ek olarak miss durumunda
+             `Refresh` ile yeniden tarama tetiklenebilir.
+            
+             Senkronizasyon: cok yazici/cok okuyucu ConcurrentDictionary — yazma sirasinda
+             sadece kismi inconsistent olabilir, lookup yine cache+fallback ile guvenli.
+             </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TrackingNumberIndex.Upsert(System.String,System.String,System.String)">
+            <summary>Tek kayit ekle/guncelle — yeni shipment olusturulduktan sonra cagrilabilir.</summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Infrastructure.TrackingNumberIndex.RebuildAsync(Kargoyeri.Application.Services.CustomerService,Kargoyeri.Application.Services.CargoOrchestrator,System.Threading.CancellationToken)">
+            <summary>Tum tenant'lardan rebuild — pahali, gunde 1 kez veya manuel cagrilir.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Infrastructure.WorkerStatusTracker">
+            <summary>
+            Background worker'ın son çalışma durumunu tutan singleton.
+            Dashboard'da gösterilmek üzere thread-safe güncellenir.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Models.EmptyStateModel">
+            <summary>
+            P3-#4 — Tekrar kullanilabilir bos durum (empty state) bileseni icin model.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.SignupFormViewModel.SelectedChannels">
+            <summary>
+            Kayıt sırasında seçilen pazaryeri kanal kodları (örn: "trendyol", "hepsiburada").
+            Onaylandıktan sonra tenant metadata'sına işlenir; credential girişi sonradan yapılır.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.SignupFormViewModel.SelectedExtraSources">
+            <summary>
+            Hangi alternatif kaynakları (NopCommerce, Embedded mini-shop) kullanacak — opsiyonel ön seçim.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.DashboardViewModel.ShipmentsByStatus">
+            <summary>Durum adı → gönderi sayısı (Donut chart)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.DashboardViewModel.ShipmentsByProvider">
+            <summary>Provider adı → gönderi sayısı (Bar chart)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.DashboardViewModel.TrendLabels">
+            <summary>Son 7 günün tarihleri (dd.MM) sıralı</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.DashboardViewModel.TrendCounts">
+            <summary>Son 7 günün günlük gönderi sayıları (TrendLabels ile eşleşir)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.DashboardViewModel.NotificationsByChannel">
+            <summary>Bildirim kanal → (toplam, başarılı, başarısız) tuple</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel">
+            <summary>
+            P3-#2 — Musteri kullanicilara gosterilen sade, gorsel dashboard.
+            HomeController.Index non-admin icin bu modeli besler.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.TodayCount">
+            <summary>Bugun olusturulan gonderi sayisi (KPI #1)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.Last7DaysCount">
+            <summary>Son 7 gun toplam (KPI #2)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.InTransitCount">
+            <summary>Yolda olan toplam (KPI #3)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.DeliveredThisMonth">
+            <summary>Bu ayki teslim edilenler (KPI #4)</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.TrendCounts">
+            <summary>Son 7 gunun gunluk sayilari (mini bar chart).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.TrendLabels">
+            <summary>TrendCounts ile eslesen tarih etiketleri (dd.MM).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.TrendPeak">
+            <summary>Trend penceresinin pik degeri (yuzde hesabi icin).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.ShipmentsByStatus">
+            <summary>Status -> count (donut/list).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.ShipmentsByProvider">
+            <summary>Provider -> count (bar list).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CustomerDashboardViewModel.RecentShipments">
+            <summary>Son 6 gonderi (recent activity feed).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Models.MarketplaceSelectionInput">
+            <summary>Çoklu pazaryeri girişi — kanal başına aktif/credential set.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.MarketplaceSelectionInput.Fields">
+            <summary>Descriptor'dan gelen field key'lerine göre kullanıcının girdiği değerler.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Models.ProviderSelectionInput">
+            <summary>Çoklu kargo firması girişi — provider başına aktif/credential set.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ProviderSettingsEditorViewModel.HasStoredPassword">
+            <summary>GET sirasinda formu doldururken gercek degerleri HTML'e yazmamak icin flag.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentCreateFormViewModel.SourceChannel">
+            <summary>Sipariş kaynağı — operatör manuel oluştururken seçer. null = Manual default.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentCreateFormViewModel.SourceChannelCode">
+            <summary>Enum dışı kanal kodu (Shopify-acme, Custom-API vs.). SourceChannel dolduysa görmezden gelinir.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentFilterViewModel.Source">
+            <summary>Sipariş kaynağı filtresi — OrderSourceChannelDto adı (ör. "Trendyol") veya string kod.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentFilterViewModel.ShowArchived">
+            <summary>P2-#6 — true ise arsivlenmis (soft-delete) gonderiler de gosterilir.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.IsAdmin">
+            <summary>Yönetici mi yoksa müşteri mi? View bu değere göre ek bölümler gösterir.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.ReadyProviders">
+            <summary>Müşterinin inline olarak kargo firması seçebileceği hazır firmalar.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.ArchivedReferences">
+            <summary>P2-#6 — bu sayfadaki arsivlenmis gonderi referans seti.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.TotalArchived">
+            <summary>P2-#6 — workspace genelinde arsivlenmis kayit sayisi (UI badge).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.SourceCounts">
+            <summary>
+            Sipariş kaynağı chip-filtre sayımları. Key = OrderSourceChannelDto adı veya "_none";
+            Value = bu kaynaktan gelen toplam (filtresiz) sipariş sayısı. View chip render eder.
+            </summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.ShipmentWorkspaceViewModel.SelectedSource">
+            <summary>Şu anda seçili olan kaynak filtresi. null = tümü.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.AccessLoginViewModel.AdminErrorMessage">
+            <summary>Admin sekmesinde hata mesaji (UI'da ayri gosterilebilir).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.AccessLoginViewModel.ActiveTab">
+            <summary>Hangi sekme aktif: "code" (varsayilan) veya "admin".</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.LicenseInput.LicenseCode">
+            <summary>Boş bırakılırsa otomatik üretilir.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.NewCustomerInput.SelectedChannels">
+            <summary>Pazaryeri kanal kodları (örn: "trendyol", "hepsiburada").</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.NewCustomerInput.SelectedExtraSources">
+            <summary>NopCommerce, embedded shop gibi diğer kaynak kodları.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.CodReportRowViewModel.PaymentType">
+            <summary>cod_cash | cod_card | "" (on odemeli — burada gozukmemeli).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.BrandName">
+            <summary>Tenant marka adi (urun gondericisi).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.RecipientCity">
+            <summary>Sadece il (KVKK — adres detayi gizli).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.RecipientNameMasked">
+            <summary>Maskelenmis alici adi (Ahmet Y****).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.ProgressSteps">
+            <summary>P3-#1 — Yatay durum cubugu icin 5 asamalik gorsel ilerleme.</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.ProgressPercent">
+            <summary>0..100 yuzde. Cubuk dolulugu icin (CSS width).</summary>
+        </member>
+        <member name="P:Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel.IsTerminalFailure">
+            <summary>true ise iptal/basarisiz; cubuk kirmiziya doner.</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Models.PublicTrackingStepViewModel">
+            <summary>
+            P3-#1 — Public tracking sayfasinda 5 adimlik gorsel durum cubugunun tek bir asamasi.
+            State: "completed" (✓), "active" (animasyonlu), "pending" (gri), "failed" (kirmizi).
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.Models.PublicTrackingStepViewModel.#ctor(System.String,System.String,System.String,System.String)">
+            <summary>
+            P3-#1 — Public tracking sayfasinda 5 adimlik gorsel durum cubugunun tek bir asamasi.
+            State: "completed" (✓), "active" (animasyonlu), "pending" (gri), "failed" (kirmizi).
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Resources.SharedResource">
+            <summary>
+            Marker class for IStringLocalizer&lt;SharedResource&gt;.
+            .resx files in this folder (SharedResource.resx, SharedResource.en.resx) feed it.
+            Default culture is Turkish (tr-TR); SharedResource.resx contains TR strings.
+            SharedResource.en.resx provides English translations.
+            </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Services.DataRetentionService">
+             <summary>
+             KVKK + DATA-RETENTION.md politikasini uygulayan otomatik temizleme job'u (P1-#3).
+            
+             Calisma kosulu:  Gunde 1 kez (24 saat).
+             Yaptiklari:
+               1) 24 aydan eski gonderilerin alici bilgilerini anonimlestirir
+                  (Recipient.Name/Phone/Email/AddressLine* — VUK gerekli alanlar
+                   OrderReference / CollectionAmount / TrackingNumber korunur).
+               2) KVKK silme talebi onaylanmis ve HardDeleteAt gecmis tenant'larin
+                  tum gonderilerini (yas farketmeksizin) anonimlestirir + tenant
+                  Metadata'sinda kvkk.deletion.status=executed isaretler.
+            
+             Idempotent: shipment.Metadata["kvkk.anonymized"]=true olanlar atlanir.
+             </summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Services.DataRetentionService.ShipmentRetentionMonths">
+            <summary>Gonderiler bu yastan eski olunca otomatik anonimlestirilir.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Services.DataRetentionService.AnonymizedFlagKey">
+            <summary>shipment.Metadata bayragi.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Services.DataRetentionService.DeletionExecutedStatus">
+            <summary>Tenant Metadata — KVKK talebi tamamen islendigini isaretler.</summary>
+        </member>
+        <member name="F:Kargoyeri.Studio.Core.Services.DataRetentionService.CycleInterval">
+            <summary>Her dongu arasi 24 saat (uretimde sabit; testte degistirilemez — basit P1).</summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Services.MarketplaceOrderSyncService">
+             <summary>
+             Tum tenant'lari tarayan ve aktif konfigure edilmis pazaryeri kanallarindan
+             her dakika siparis ceken arka plan servisi.
+            
+             Calisma mantigi (per-tenant per-channel job):
+               1) 60 saniyelik tick.
+               2) Aktif (IsActive) tenant'lari listele.
+               3) Her tenant icin:
+                  a) Legacy <see cref="T:Kargoyeri.Studio.Core.Infrastructure.MarketplaceWorkspaceSettings"/> (tek pazaryeri secimi):
+                     HasConfiguration ve AutoSyncEnabled ise <see cref="T:Kargoyeri.Studio.Core.Infrastructure.MarketplaceOrderSyncEngine"/>
+                     calistir — bu engine artik Live adapter bridge'i uzerinden 7 platformu da destekliyor.
+                  b) Multi-channel <see cref="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelMetadata"/> (Pazarama, ÇiçekSepeti, Amazon, ...):
+                     Enabled ve tum required field'lar dolu ise <see cref="T:Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelSyncEngine"/> ile
+                     o kanali tek tek sync et.
+               4) Kullanilmayan (Enabled=false veya HasConfiguration=false) kanallar atlanir — hic API cagrisi olmaz.
+             </summary>
+        </member>
+        <member name="T:Kargoyeri.Studio.Core.Services.OutboundWebhookRetryService">
+            <summary>
+            P2-#3 — Failed (basarisiz) webhook bildirimlerini exponential backoff ile
+            otomatik olarak yeniden dener. NotificationService.RetryAsync'i cagirir.
+            Schedule (OutboundWebhookRetryQueue.BackoffSchedule):
+              1m, 5m, 15m, 1h, 6h, 24h — 6 deneme sonra terkedilir.
+            </summary>
+        </member>
+        <member name="M:Kargoyeri.Studio.Core.StudioServiceExtensions.AddKargoyeriStudio(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration,System.String)">
+            <summary>
+            Kargoyeri icin gerekli tum servisleri DI'a kaydeder.
+            Hem standalone (Web) hem de gomulu (Embedded) host tarafindan cagrilir.
+            </summary>
+        </member>
+    </members>
+</doc>

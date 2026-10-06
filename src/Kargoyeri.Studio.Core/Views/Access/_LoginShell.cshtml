@@ -1,0 +1,91 @@
+@{
+    Layout = null;
+    var title = ViewData["AuthTitle"] as string ?? "Giriş yap";
+    var lead = ViewData["AuthLead"] as string ?? "Hesabınıza giriş yaparak kargo operasyonlarını yönetin.";
+    var kicker = ViewData["AuthKicker"] as string ?? "Yönetim paneli";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Kargoyeri</title>
+    <meta name="theme-color" content="#17243d" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <link rel="stylesheet" href="~/_content/Kargoyeri.Studio.Core/css/site.css" asp-append-version="true" />
+</head>
+<body class="auth-body">
+    <div class="auth-split">
+        <section class="auth-pane">
+            <div class="auth-card">
+                <div class="auth-brandline">
+                    <span class="auth-mark" aria-hidden="true">KY</span>
+                    <div>
+                        <strong>Kargoyeri</strong>
+                        <small>@kicker</small>
+                    </div>
+                </div>
+                <h1>@title</h1>
+                <p class="auth-lead">@lead</p>
+                @RenderBody()
+            </div>
+            <p class="auth-legal">
+                Sisteme giriş yaparak
+                <a href="/legal/privacy">KVKK Aydınlatma Metni</a>'ni,
+                <a href="/legal/terms">Kullanım Şartları</a>'nı ve
+                <a href="/legal/cookies">Çerez Politikası</a>'nı kabul etmiş sayılırsınız.
+            </p>
+        </section>
+
+        <aside class="auth-stage" aria-hidden="true">
+            <div class="auth-stage-top">
+                <span class="auth-stage-logo">kargoyeri</span>
+                <span class="auth-live"><span></span> Canlı</span>
+            </div>
+            <div class="auth-stage-copy">
+                <span class="auth-pill">Kargo operasyonları</span>
+                <h2>Gönderileri tek ekranda kapatın</h2>
+                <p>Oluşturma, takip ve iptal. Kargo firmalarını tek panelden yönetin.</p>
+                <div class="auth-chips">
+                    <span>Gönderi</span>
+                    <span>Takip</span>
+                    <span>Entegrasyon</span>
+                </div>
+            </div>
+            <div class="auth-stage-grid">
+                <article>
+                    <strong>Gönderi oluştur</strong>
+                    <span>Barkod ve takip numarası</span>
+                </article>
+                <article>
+                    <strong>Canlı durum</strong>
+                    <span>Teslim ve iade hareketi</span>
+                </article>
+                <article>
+                    <strong>Entegrasyon</strong>
+                    <span>Sürat, pazaryeri, Nop</span>
+                </article>
+                <article>
+                    <strong>Operasyon</strong>
+                    <span>İptal, yenile, sertifikasyon</span>
+                </article>
+            </div>
+            <p class="auth-stage-foot">Kargoyeri · kargo operasyon paneli</p>
+        </aside>
+    </div>
+    <script>
+        document.querySelectorAll("[data-toggle-password]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                var input = button.parentElement.querySelector("input");
+                if (!input) return;
+                var show = input.type === "password";
+                input.type = show ? "text" : "password";
+                button.setAttribute("aria-label", show ? "Şifreyi gizle" : "Şifreyi göster");
+                button.classList.toggle("is-on", show);
+            });
+        });
+    </script>
+</body>
+</html>

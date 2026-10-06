@@ -1,0 +1,60 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+build/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# ---- Visual Studio ----
+.vs/
+.vs.stale-*/
+.vs.reset-*/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.VisualState.xml
+ms-persist.xml
+
+# ---- Rider / VS Code ----
+.idea/
+.vscode/
+
+# ---- .NET ----
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nupkg
+*.snupkg
+.dotnet/
+
+# ---- Logs / temp ----
+*.log
+build-web.log
+build-web-norestore.log
+studio-run.log
+studio-run.err.log
+*.tmp
+*.pid
+
+# ---- Backups / recovery archives (kept on disk, not in git) ----
+_recovery/*.zip
+_backups/
+
+# ---- Secrets ----
+appsettings.Production.json
+appsettings.*.local.json
+*.pfx
+dataprotection-keys/
+**/data-protection-keys/
+**/activity-logs/
+**/tenant-metrics/
+**/src/Kargoyeri.Studio.Web/data/
+**/.build-cache-archive/

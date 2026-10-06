@@ -1,0 +1,23 @@
+@model AccessLoginTotpViewModel
+@{
+    Layout = "_LoginShell";
+    ViewData["Title"] = "İki adımlı doğrulama";
+    ViewData["AuthKicker"] = "Güvenlik";
+    ViewData["AuthTitle"] = "İki adımlı doğrulama";
+    ViewData["AuthLead"] = $"{(string.IsNullOrWhiteSpace(Model.DisplayName) ? Model.Username : Model.DisplayName)} hesabı için authenticator kodunu girin.";
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="auth-alert" role="alert">@Model.ErrorMessage</div>
+}
+<form asp-action="@(Model.IsAdmin ? "LoginAdminTotp" : "LoginTotp")" method="post" class="auth-form" autocomplete="off">
+    <label>
+        <span>Doğrulama kodu</span>
+        <span class="auth-field">
+            <input asp-for="Code" class="auth-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" autofocus />
+        </span>
+        <span asp-validation-for="Code" class="field-validation-error"></span>
+    </label>
+    <button class="auth-submit" type="submit">Doğrula</button>
+</form>
+<p class="auth-back"><a asp-action="Login">İptal et ve yeniden başlat</a></p>

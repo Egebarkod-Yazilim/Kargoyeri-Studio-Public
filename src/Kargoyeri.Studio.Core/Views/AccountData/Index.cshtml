@@ -1,0 +1,15 @@
+@model AccountDataViewModel
+@{
+    ViewData["Title"] = "Veri Dışa Aktarma";
+}
+
+<section class="panel-card" style="max-width:760px;">
+    <p class="eyebrow">Kargoyeri</p>
+    <h1 style="margin:6px 0 16px;">Veri dışa aktarma</h1>
+    <p class="provider-index-note">
+        Çalışma alanındaki gönderi, bildirim, denetim ve panel hareketlerinin arşivini indirebilirsiniz.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+        <a class="primary-button" asp-action="ExportMyData">PDF + JSON Paketi İndir</a>
+    </div>
+</section>

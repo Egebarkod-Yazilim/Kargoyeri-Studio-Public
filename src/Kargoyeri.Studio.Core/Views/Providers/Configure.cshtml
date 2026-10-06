@@ -1,0 +1,1028 @@
+@model ProviderSettingsEditorViewModel
+@functions {
+
+    // â”€â”€ Entegrasyon Akisi â€” her provider'a ozel endpoint listesi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    record OpFlow(
+        string Name,
+        string MethodBadge,
+        string MethodCss,
+        string EndpointShort,
+        string ImplBadge,
+        string ImplCss,
+        string? Note = null);
+
+    static IReadOnlyList<OpFlow> GetOpFlow(string pcode) => pcode.ToLower() switch
+    {
+        "surat" => new OpFlow[]
+        {
+            new("Gonderi Olustur", "POST",   "mth-post",  "api02/api01 › GonderiBarkodOlustur veya SOAP GonderiyiKargoyaGonderYeni", "Canli", "imp-live"),
+            new("Iptal Et",        "POST",   "mth-post",  "suratkargo.com.tr › GonderiSil",                  "Canli",          "imp-live"),
+            new("Durum Sorgula",   "POST",   "mth-post",  "api › KargoTakipHareketDetayi (CariKodu, Sifre, WebSiparisKodu)", "Canli", "imp-live"),
+        },
+        "hepsijet" => new OpFlow[]
+        {
+            new("Token Al",        "GET",    "mth-get",   "hepsijet.com â€º /auth/getToken",                   "Otomatik",       "imp-auto", "Her gonderi isleminden once X-Auth-Token alinir."),
+            new("Gonderi Olustur", "POST",   "mth-post",  "hepsijet.com â€º sendDeliveryOrderEnhanced",        "Canli",          "imp-live"),
+            new("Iptal Et",        "POST",   "mth-post",  "hepsijet.com â€º deleteDeliveryOrder/{id}",         "Canli",          "imp-live"),
+            new("Durum Sorgula",   "POST",   "mth-post",  "hepsijet.com â€º delivery/integration/track",       "Canli",          "imp-live"),
+        },
+        "mng" => new OpFlow[]
+        {
+            new("Gonderi Olustur", "SOAP",   "mth-soap",  "mngkargo.com.tr â€º SiparisGirisiDetayliV2",        "Canli",          "imp-live"),
+            new("Iptal Et",        "SOAP",   "mth-soap",  "mngkargo.com.tr â€º MusteriSiparisIptal",           "Canli",          "imp-live"),
+            new("Durum Sorgula",   "â€”",      "mth-sim",   "Simulasyon ilerletme",                            "Simulasyon",     "imp-sim",  "MNG SOAP status endpoint'i legacy projede yoktu; simule ilerler."),
+        },
+        "aras" => new OpFlow[]
+        {
+            new("Gonderi Olustur", "SOAP",   "mth-soap",  "araskargo.com.tr â€º SetOrder",                     "Canli",          "imp-live"),
+            new("Iptal Et",        "SOAP",   "mth-soap",  "araskargo.com.tr â€º CancelDispatch",               "Canli",          "imp-live"),
+            new("Durum Sorgula",   "â€”",      "mth-sim",   "Simulasyon ilerletme",                            "Simulasyon",     "imp-sim",  "Aras durum takibi kurumsal panel uzerinden yapilir; API entegresi yok."),
+        },
+        "ptt" => new OpFlow[]
+        {
+            new("Gonderi Olustur", "SOAP",   "mth-soap",  "pttws.ptt.gov.tr â€º kabulEkle2",                   "Canli",          "imp-live"),
+            new("Iptal Et",        "â€”",      "mth-none",  "Desteklenmiyor",                                  "Desteklenmez",   "imp-none", "PTT API'si iptal operasyonunu desteklemiyor. PTT is yeri panelini kullanin."),
+            new("Durum Sorgula",   "â€”",      "mth-sim",   "Simulasyon ilerletme",                            "Simulasyon",     "imp-sim",  "PTT durum sorgu servisi henuz entegre edilmemistir."),
+        },
+        "ups" => new OpFlow[]
+        {
+            new("OAuth Token",     "POST",   "mth-post",  "onlinetools.ups.com â€º /security/v1/oauth/token",  "Otomatik",       "imp-auto", "ClientId + ClientSecret ile her islemde otomatik alinir."),
+            new("Gonderi Olustur", "POST",   "mth-post",  "onlinetools.ups.com â€º /api/shipments/v2403/ship", "Canli",          "imp-live"),
+            new("Iptal Et",        "DELETE", "mth-delete","onlinetools.ups.com â€º /api/.../void/cancel/{id}", "Canli",          "imp-live"),
+            new("Durum Sorgula",   "GET",    "mth-get",   "onlinetools.ups.com â€º /api/track/v1/details/{no}","Canli",          "imp-live"),
+        },
+        "trendyolexpress" => new OpFlow[]
+        {
+            new("Depo Ata",        "PUT",    "mth-put",   "api.trendyol.com â€º orders/{id}/update-warehouse-information", "Canli", "imp-live", "Klasik gonderi degil; Trendyol siparisine depo atar."),
+            new("Iptal Et",        "â€”",      "mth-none",  "Desteklenmiyor",                                  "Desteklenmez",   "imp-none", "Trendyol siparisleri Satis Paneli uzerinden iptal edilir."),
+            new("Siparis Durumu",  "GET",    "mth-get",   "api.trendyol.com â€º orders/shipment-packages?orderNumber={id}", "Canli", "imp-live"),
+        },
+        "yurtici" => new OpFlow[]
+        {
+            new("Gonderi Olustur", "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim",  "Yurtici Kargo kamuya acik API sunmamaktadir."),
+            new("Iptal Et",        "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim"),
+            new("Durum Sorgula",   "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim"),
+        },
+        _ => new OpFlow[]
+        {
+            new("Gonderi Olustur", "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim"),
+            new("Iptal Et",        "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim"),
+            new("Durum Sorgula",   "â€”",      "mth-sim",   "Simulasyon",                                      "Simulasyon",     "imp-sim"),
+        }
+    };
+
+    // â”€â”€ Desteklenen islem etiketi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    static string OpLabel(string op) => op switch
+    {
+        "CreateShipment"     => "Gonderi Olustur",
+        "TrackShipment"      => "Kargo Takip",
+        "CancelShipment"     => "Iptal Et",
+        "GetLabel"           => "Barkod / Etiket",
+        "GetBranches"        => "Sube Listesi",
+        "GetCities"          => "Sehir Listesi",
+        "GetDistricts"       => "Ilce Listesi",
+        "GetServicePoints"   => "Servis Noktasi",
+        "GetPriceList"       => "Fiyat Listesi",
+        "RescheduleDelivery" => "Teslimat Planla",
+        "ReturnShipment"     => "Iade Olustur",
+        _                    => op
+    };
+
+    // Her provider icin alan aciklamalari
+    record FieldMeta(string Label, string Placeholder, string? Hint, bool Required = true, bool Hidden = false);
+
+    static FieldMeta ClientCodeMeta(string providerCode) => providerCode.ToLower() switch
+    {
+        "surat"           => new("Cari Kodu",              "Surat'tan aldiginiz cari kodu",          "REST ve SOAP cagrilarinda CariKodu / KullaniciAdi olarak gider."),
+        "ptt"             => new("Musteri ID",              "Ornk: 12345",                            "Sayisal musteriId â€” PTT tarafindan atanir. Zorunlu."),
+        "ups"             => new("Hesap Numarasi",          "UPS shipper account number",             "ShipperNumber: UPS portali > Hesabim > Hesap Numarayi"),
+        "trendyolexpress" => new("Trendyol Satici ID",      "Ornk: 123456",                           "Trendyol Seller API'den alinan numerik satici ID'si."),
+        "hepsijet"        => new("Client Code",             "HepsiJet tarafindan verilen",            "getToken cagrÄ±sÄ±nda clientCode parametresi olarak gonderilir."),
+        "mng"             => new("Musteri Kodu",            "(MNG gerektirmiyorsa bos birakin)",      "MNG SOAP'ta kullanim durumuna gore opsiyoneldir.", Required: false),
+        "aras"            => new("Musteri Kodu",            "(Aras gerektirmiyorsa bos birakin)",     "Aras SOAP'ta IntegrationCode olarak kullanilmaz; username/password yeterlidir.", Required: false),
+        _                 => new("Musteri Kodu",            "Firma tarafindan verilen musteri kodu",  null)
+    };
+
+    static FieldMeta UsernameMeta(string providerCode) => providerCode.ToLower() switch
+    {
+        "surat"           => new("", "", "", Required: false, Hidden: true),
+        "ups"             => new("OAuth Client ID",         "portal.ups.com > Uygulamam > Client ID", "UPS Developer Portal'da olusturulan OAuth uygulamasinin Client ID'si."),
+        "ptt"             => new("Kullanici",               "PTT servis kullanici adi",               "kabulEkle2 SOAP cagrÄ±sÄ±nda kullanici parametresi."),
+        "trendyolexpress" => new("API Kullanici Adi",       "Trendyol partner portal username",       "Trendyol Seller API Basic Auth kullanici adi."),
+        "hepsijet"        => new("Kullanici Adi",           "HepsiJet entegrasyon kullanici adi",     "getToken cagrÄ±sÄ±nda userName parametresi."),
+        _                 => new("Kullanici Adi",           "Servis kullanici adi",                   null)
+    };
+
+    static FieldMeta PasswordMeta(string providerCode) => providerCode.ToLower() switch
+    {
+        "ups"             => new("", "", "", Required: false, Hidden: true),
+        "surat"           => new("Sifre",                   "Surat kullanici sifresi",                "REST/SOAP Sifre parametresi. COD icin AdditionalSettings'e panelPasswordCod ekleyin."),
+        "ptt"             => new("Sifre",                   "PTT servis sifresi",                     "kabulEkle2 SOAP cagrÄ±sÄ±nda sifre parametresi."),
+        "trendyolexpress" => new("API Sifresi",             "Trendyol partner portal password",       "Trendyol Seller API Basic Auth sifresi."),
+        "hepsijet"        => new("Sifre",                   "HepsiJet entegrasyon sifresi",           "getToken cagrÄ±sÄ±nda password parametresi."),
+        _                 => new("Sifre",                   "Servis sifresi",                         null)
+    };
+
+    static FieldMeta ApiKeyMeta(string providerCode) => providerCode.ToLower() switch
+    {
+        "ups"             => new("OAuth Client Secret",     "portal.ups.com > Uygulamam > Client Secret", "UPS OAuth token almak icin gerekli gizli anahtar."),
+        "ptt"             => new("Barkod Baslangic Degeri", "Ornk: 10000000000",                      "Barkod uretimi icin baslangic tohumu. Opsiyonel; yoksa rastgele uretilir.", Required: false),
+        "surat"           => new("", "", "", Required: false, Hidden: true),
+        "mng"             => new("", "", "", Required: false, Hidden: true),
+        "aras"            => new("", "", "", Required: false, Hidden: true),
+        "hepsijet"        => new("", "", "", Required: false, Hidden: true),
+        "trendyolexpress" => new("", "", "", Required: false, Hidden: true),
+        _                 => new("API Key",                 "API anahtari veya token",                null)
+    };
+
+    static FieldMeta EndpointMeta(string providerCode) => providerCode.ToLower() switch
+    {
+        "surat"           => new("API Adresi",  "https://api02.suratkargo.com.tr",            "REST test: api02 | REST canli: api01 | SOAP test: https://prova.suratkargo.com.tr/services.asmx | SOAP canli: https://webservices.suratkargo.com.tr/services.asmx", Required: false),
+        "hepsijet"        => new("API Adresi",  "https://integration-api.hepsijet.com",       "Test: integration-apitest.hepsijet.com | Prod: integration-api.hepsijet.com", Required: false),
+        "mng"             => new("SOAP Adresi", "http://service.mngkargo.com.tr/...",         "Varsayilan SOAP URL icsel tanimlidir; degistirmek icin bos birakin.", Required: false),
+        "aras"            => new("SOAP Adresi", "https://customerservicestest.araskargo.com.tr/...", "Test: customerservicestest | Prod: customerservices URL'ini girin.", Required: false),
+        "ups"             => new("API Adresi",  "https://onlinetools.ups.com",                "Varsayilan: onlinetools.ups.com â€” CTE (test) icin wwwcie.ups.com.", Required: false),
+        "ptt"             => new("SOAP Adresi", "http://pttws.ptt.gov.tr/...",                "Varsayilan PTT SOAP endpoint icsel tanimlidir; bos birakin.", Required: false),
+        "trendyolexpress" => new("API Adresi",  "https://api.trendyol.com",                   "Varsayilan: api.trendyol.com â€” degistirmeye gerek yok.", Required: false),
+        _                 => new("Servis Adresi", "ornek: https://api.firma.com.tr/v2",       null, Required: false)
+    };
+
+    // AdditionalSettings referans karti
+    record SettingHint(string Key, string Desc, bool Required = false);
+
+    static IReadOnlyList<SettingHint> AdditionalHints(string providerCode) => providerCode.ToLower() switch
+    {
+        "surat" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+            new SettingHint("transport",         "rest veya soap. Bos ise endpoint adresinden secilir"),
+            new SettingHint("packageType",       "1 Dosya, 2 Mi, 3 Koli (varsayilan 2)"),
+            new SettingHint("usernameCod",       "Kapida odeme (COD) siparisleri icin ayri cari kodu"),
+            new SettingHint("panelPasswordCod",  "Kapida odeme (COD) siparisleri icin ayri sifre"),
+            new SettingHint("ekHizmetler",       "GondericiyeSms, TelefonIhbar, AliciyaSms, AdrestenAlim"),
+        },
+        "hepsijet" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+        },
+        "ups" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+            new SettingHint("companyName",       "Gonderici firma adi (kargo etiketinde gorunur)",          Required: true),
+            new SettingHint("companyAddress",    "Gonderici adres satiri",                                  Required: true),
+            new SettingHint("cityCode",          "Gonderici sehir kodu (UPS city code, ornk: IST)"),
+            new SettingHint("oauthClientSecret", "ApiKey alanina sigmazsa buraya OAuth client secret girin"),
+        },
+        "trendyolexpress" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+            new SettingHint("warehouseId",       "Varsayilan Trendyol depo ID'si (gonderi formunda ezilebilir)", Required: true),
+        },
+        "ptt" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+            new SettingHint("barcodeSeed",       "Barkod baslangic degeri (ApiKey alanina da girilebilir)"),
+        },
+        "aras" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+        },
+        "mng" => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API cagrilmaz, simulasyon ile ilerler"),
+        },
+        _ => new[]
+        {
+            new SettingHint("simulationMode",    "true = gercek API yerine simulasyon modu aktiflesir"),
+        }
+    };
+}
+@{
+    ViewData["Title"] = $"{Model.ProviderName} Ayarlari";
+    int missingCount = Model.Status.MissingSettings.Count;
+    int readinessPercent = Model.Status.CanCreateShipment
+        ? 100
+        : Math.Max(0, 100 - (missingCount * 25));
+    bool isWarn = readinessPercent < 60;
+    var ops = Model.Profile.SupportedOperations.ToList();
+    var pcode = Model.ProviderCode;
+
+    var fClientCode = ClientCodeMeta(pcode);
+    var fUsername   = UsernameMeta(pcode);
+    var fPassword   = PasswordMeta(pcode);
+    var fApiKey     = ApiKeyMeta(pcode);
+    var fEndpoint   = EndpointMeta(pcode);
+    var hints       = AdditionalHints(pcode);
+    var opFlow      = GetOpFlow(pcode);
+}
+
+@if (TempData["PingResult"] is string pingResult)
+{
+    <div class="flash @(pingResult == "ok" ? "" : "flash--warn")" style="margin-bottom:16px;">
+        <strong>@(pingResult == "ok" ? "Baglanti Basarili" : "Baglanti Basarisiz")</strong> â€” @TempData["PingMessage"]
+    </div>
+}
+
+@* Provider renkli banner *@
+<div class="provider-config-banner @Model.Visual.AccentClass">
+    <div>
+        <p class="eyebrow">@Model.WorkspaceName &rsaquo; Kargo Firmalari</p>
+        <h1>@Model.ProviderName</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Visual.Caption))
+        {
+            <p>@Model.Visual.Caption</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(Model.Visual.Headline))
+        {
+            <p>@Model.Visual.Headline</p>
+        }
+    </div>
+    <div class="banner-stats">
+        <div class="banner-stat-row">
+            <span>Mod:</span>
+            <strong>@Model.Status.IntegrationMode</strong>
+        </div>
+        <div class="banner-stat-row">
+            <span>Canli API:</span>
+            <strong>@(Model.Status.LiveTransportImplemented ? "Var" : "Yok")</strong>
+        </div>
+        <div class="banner-stat-row">
+            <span>Durum:</span>
+            <strong>@(Model.Status.CanCreateShipment ? "Hazir" : "Eksik Alan Var")</strong>
+        </div>
+        <form asp-action="Ping" asp-route-id="@Model.ProviderCode" method="post" class="ping-form" style="margin-top:10px;">
+            <button class="secondary-button" type="submit" style="font-size:.82rem;padding:6px 14px;">
+                Baglanti Test Et
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="split-layout split-layout--wide">
+
+    @* SOL: Ayar formu *@
+    <section class="panel-card">
+        <div class="section-heading section-heading--tight">
+            <div>
+                <p class="eyebrow">Kimlik ve Baglanti</p>
+                <h2>API Ayarlari</h2>
+            </div>
+        </div>
+
+        @* ── Stepper ────────────────────────────────────────────────── *@
+        <div class="prov-wizard">
+            <div class="prov-stepper" id="provStepper">
+                <div class="prov-step is-active" data-step="1">
+                    <span class="ps-num">1</span>
+                    <div class="ps-text">
+                        <strong>Aktivasyon</strong>
+                        <span>Firmayı aç/kapat</span>
+                    </div>
+                </div>
+                <div class="prov-step" data-step="2">
+                    <span class="ps-num">2</span>
+                    <div class="ps-text">
+                        <strong>Kimlik Bilgileri</strong>
+                        <span>Kullanıcı / şifre</span>
+                    </div>
+                </div>
+                <div class="prov-step" data-step="3">
+                    <span class="ps-num">3</span>
+                    <div class="ps-text">
+                        <strong>API Bağlantısı</strong>
+                        <span>Anahtar / endpoint</span>
+                    </div>
+                </div>
+                <div class="prov-step" data-step="4">
+                    <span class="ps-num">4</span>
+                    <div class="ps-text">
+                        <strong>Ek Ayarlar & Kayıt</strong>
+                        <span>Onay ve kaydet</span>
+                    </div>
+                </div>
+            </div>
+
+            <form asp-action="Configure" method="post" class="form-grid prov-form" id="provForm">
+                <input asp-for="ProviderCode" type="hidden" />
+                <input asp-for="ProviderName" type="hidden" />
+
+                @* ── Adım 1: Aktivasyon ───────────────────────────── *@
+                <div class="prov-pane is-active" data-pane="1">
+                    <div class="prov-pane-head">
+                        <h3>1. Bu firmayı aktif kullan</h3>
+                        <p>Aktif olmayan firma üzerinden gönderi oluşturulamaz. İstediğiniz zaman kapatıp açabilirsiniz.</p>
+                    </div>
+                    <div class="toggle-row-v2">
+                        <div>
+                            <strong>@Model.ProviderName aktif</strong>
+                            <p style="margin:3px 0 0;font-size:.85rem;color:var(--muted);">Kapalı firmanın gönderi oluşturması engellenir.</p>
+                        </div>
+                        <input asp-for="IsEnabled" type="checkbox" style="width:20px;height:20px;" />
+                    </div>
+                </div>
+
+                @* ── Adım 2: Kimlik Bilgileri ──────────────────────── *@
+                <div class="prov-pane" data-pane="2">
+                    <div class="prov-pane-head">
+                        <h3>2. Kimlik Bilgileri</h3>
+                        <p>Bu firma sizi tanımak için aşağıdaki bilgileri kullanır.</p>
+                    </div>
+
+                    @if (!fClientCode.Hidden)
+                    {
+                        <label>
+                            <span>
+                                @fClientCode.Label
+                                @if (fClientCode.Required) { <span class="field-required">zorunlu</span> }
+                                else { <span class="field-optional">opsiyonel</span> }
+                            </span>
+                            <input asp-for="ClientCode" placeholder="@fClientCode.Placeholder" />
+                            @if (!string.IsNullOrWhiteSpace(fClientCode.Hint))
+                            {
+                                <small class="field-hint">@fClientCode.Hint</small>
+                            }
+                        </label>
+                    }
+
+                    @if (!fUsername.Hidden)
+                    {
+                        <label>
+                            <span>
+                                @fUsername.Label
+                                @if (fUsername.Required) { <span class="field-required">zorunlu</span> }
+                                else { <span class="field-optional">opsiyonel</span> }
+                            </span>
+                            <input asp-for="Username" placeholder="@fUsername.Placeholder" />
+                            @if (!string.IsNullOrWhiteSpace(fUsername.Hint))
+                            {
+                                <small class="field-hint">@fUsername.Hint</small>
+                            }
+                        </label>
+                    }
+
+                    @if (!fPassword.Hidden)
+                    {
+                        <label>
+                            <span>
+                                @fPassword.Label
+                                @if (fPassword.Required) { <span class="field-required">zorunlu</span> }
+                                else { <span class="field-optional">opsiyonel</span> }
+                            </span>
+                            <input asp-for="Password" type="password" autocomplete="new-password"
+                                   placeholder="@(Model.HasStoredPassword ? "(kayıtlı — değiştirmek için yeni değer gir)" : fPassword.Placeholder)" />
+                            @if (Model.HasStoredPassword)
+                            {
+                                <small class="field-hint" style="color:#16a34a;">&#10003; Şifre kayıtlı. Boş bırakırsan mevcut değer korunur.</small>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(fPassword.Hint))
+                            {
+                                <small class="field-hint">@fPassword.Hint</small>
+                            }
+                        </label>
+                    }
+
+                    @if (fClientCode.Hidden && fUsername.Hidden && fPassword.Hidden)
+                    {
+                        <div class="prov-empty">
+                            Bu firma kimlik bilgisi gerektirmiyor. Bir sonraki adıma geçebilirsiniz.
+                        </div>
+                    }
+                </div>
+
+                @* ── Adım 3: API Bağlantısı ────────────────────────── *@
+                <div class="prov-pane" data-pane="3">
+                    <div class="prov-pane-head">
+                        <h3>3. API Bağlantısı</h3>
+                        <p>Anahtar ve servis adresi. Çoğu firma için endpoint varsayılanı yeterlidir.</p>
+                    </div>
+
+                    @if (!fApiKey.Hidden)
+                    {
+                        <label>
+                            <span>
+                                @fApiKey.Label
+                                @if (fApiKey.Required) { <span class="field-required">zorunlu</span> }
+                                else { <span class="field-optional">opsiyonel</span> }
+                            </span>
+                            <input asp-for="ApiKey" type="password" autocomplete="new-password"
+                                   placeholder="@(Model.HasStoredApiKey ? "(kayıtlı — değiştirmek için yeni değer gir)" : fApiKey.Placeholder)" />
+                            @if (Model.HasStoredApiKey)
+                            {
+                                <small class="field-hint" style="color:#16a34a;">&#10003; API anahtarı kayıtlı. Boş bırakırsan mevcut değer korunur.</small>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(fApiKey.Hint))
+                            {
+                                <small class="field-hint">@fApiKey.Hint</small>
+                            }
+                        </label>
+                    }
+
+                    <label>
+                        <span>
+                            @fEndpoint.Label
+                            @if (fEndpoint.Required) { <span class="field-required">zorunlu</span> }
+                            else { <span class="field-optional">opsiyonel</span> }
+                        </span>
+                        <input asp-for="EndpointBase" placeholder="@fEndpoint.Placeholder" />
+                        @if (!string.IsNullOrWhiteSpace(fEndpoint.Hint))
+                        {
+                            <small class="field-hint">@fEndpoint.Hint</small>
+                        }
+                    </label>
+                </div>
+
+                @* ── Adım 4: Ek Ayarlar & Kayıt ────────────────────── *@
+                <div class="prov-pane" data-pane="4">
+                    <div class="prov-pane-head">
+                        <h3>4. Ek Ayarlar &amp; Kayıt</h3>
+                        <p>Firmaya özel ek parametreleri girip kaydedebilirsiniz. Sağdaki referans karttan kopyalayabilirsiniz.</p>
+                    </div>
+
+                    <label class="field-span">
+                        <span>Ek Parametreler <span style="font-size:.8em;font-weight:400;color:var(--muted);">(key=value, her satıra bir tane)</span></span>
+                        <textarea asp-for="AdditionalSettingsText" rows="5"
+                                  placeholder="simulationMode=true&#10;warehouseCode=IST01"></textarea>
+                        <small class="field-hint">
+                            Sağdaki referans kartında bu firma için geçerli anahtarlar listelenmiştir.
+                        </small>
+                    </label>
+
+                    <div class="prov-summary">
+                        <div class="prov-summary-row"><span>Firma:</span><strong>@Model.ProviderName</strong></div>
+                        <div class="prov-summary-row"><span>Hazırlık:</span><strong>%@readinessPercent</strong></div>
+                        <div class="prov-summary-row"><span>Mod:</span><strong>@Model.Status.IntegrationMode</strong></div>
+                        <div class="prov-summary-row"><span>Canlı API:</span><strong>@(Model.Status.LiveTransportImplemented ? "Var" : "Yok")</strong></div>
+                    </div>
+                </div>
+
+                @* ── Wizard navigasyonu ───────────────────────────── *@
+                <div class="prov-nav">
+                    <button type="button" class="secondary-button" id="provBack" disabled>← Geri</button>
+                    <span class="prov-progress" id="provProgress">Adım 1 / 4</span>
+                    <button type="button" class="primary-button" id="provNext">İleri →</button>
+                    <button type="submit" class="primary-button" id="provSave" style="display:none;">Kaydet</button>
+                </div>
+
+                <div class="action-row action-row--left" style="padding-top:6px;border-top:1px dashed var(--border);margin-top:8px;">
+                    <a class="ghost-link" asp-controller="Providers" asp-action="Index">Firmalara Dön</a>
+                    @if (Model.Status.CanCreateShipment)
+                    {
+                        <a class="ghost-link" asp-controller="Shipments" asp-action="Index">Gönderilere Git</a>
+                    }
+                </div>
+            </form>
+        </div>
+    </section>
+
+    @* SAG: Durum + Referans kartlari *@
+    <aside style="display:flex;flex-direction:column;gap:16px;">
+
+        @* Entegrasyon Akisi â€” endpoint + implementasyon durumu *@
+        <section class="panel-card">
+            <p class="eyebrow">Entegrasyon Akisi</p>
+            <p style="font-size:.82rem;color:var(--muted);margin:4px 0 14px;">
+                Bu firma ile hangi operasyonlar, hangi endpoint'ler uzerinden calisir.
+            </p>
+            <div class="op-flow-list">
+                @foreach (var op in opFlow)
+                {
+                    <div class="op-flow-row @op.ImplCss">
+                        <div class="op-flow-left">
+                            <span class="op-method @op.MethodCss">@op.MethodBadge</span>
+                            <div class="op-flow-info">
+                                <strong class="op-name">@op.Name</strong>
+                                <code class="op-endpoint">@op.EndpointShort</code>
+                                @if (!string.IsNullOrWhiteSpace(op.Note))
+                                {
+                                    <span class="op-note">@op.Note</span>
+                                }
+                            </div>
+                        </div>
+                        <span class="op-impl-badge @op.ImplCss">@op.ImplBadge</span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @* Hazirlik gostergesi *@
+        <section class="panel-card">
+            <p class="eyebrow">Hazirlik Durumu</p>
+            <div class="readiness-wrap" style="margin-top:10px;">
+                <div class="readiness-top">
+                    <span style="font-size:.88rem;color:var(--muted);">
+                        @(Model.Status.CanCreateShipment ? "Gonderi olusturmaya hazir" : $"{missingCount} eksik alan kaldi")
+                    </span>
+                    <span class="readiness-pct">%@readinessPercent</span>
+                </div>
+                <div class="readiness-bar">
+                    <div class="readiness-fill @(isWarn ? "readiness-fill--warn" : "")"
+                         style="width:@readinessPercent%"></div>
+                </div>
+            </div>
+
+            @if (missingCount > 0)
+            {
+                <div class="missing-list">
+                    @foreach (var missing in Model.Status.MissingSettings)
+                    {
+                        <div class="missing-item">@missing</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p style="font-size:.88rem;color:var(--secondary);margin:8px 0 0;">
+                    &#10003; Tum gerekli alanlar dolu. Bu firma gonderi olusturabilir.
+                </p>
+            }
+        </section>
+
+        @* Ek Ayarlar Referans Karti *@
+        @if (hints.Count > 0)
+        {
+            <section class="panel-card">
+                <p class="eyebrow">Ek Ayarlar Referansi</p>
+                <p style="font-size:.82rem;color:var(--muted);margin:6px 0 12px;">
+                    Sol taraftaki <strong>Ek Parametreler</strong> alanina asagidaki anahtarlari girebilirsiniz.
+                </p>
+                <div class="settings-hint-list">
+                    @foreach (var hint in hints)
+                    {
+                        <div class="settings-hint-item">
+                            <div class="settings-hint-key">
+                                <code>@hint.Key</code>
+                                @if (hint.Required) { <span class="field-required" style="font-size:.72rem;">zorunlu</span> }
+                            </div>
+                            <div class="settings-hint-desc">@hint.Desc</div>
+                            <div class="settings-hint-example">
+                                <button type="button" class="copy-hint-btn"
+                                        data-value="@hint.Key=">
+                                    Kopyala
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        @* Desteklenen islemler *@
+        @if (ops.Count > 0)
+        {
+            <section class="panel-card">
+                <p class="eyebrow">Desteklenen Islemler</p>
+                <p style="font-size:.85rem;color:var(--muted);margin:6px 0 10px;">
+                    Bu entegrasyon @ops.Count islem destekliyor.
+                </p>
+                <div class="cap-list">
+                    @foreach (var op in ops)
+                    {
+                        <span class="cap-tag">@OpLabel(op)</span>
+                    }
+                </div>
+            </section>
+        }
+
+        @* Studio islem rotalari *@
+        <section class="panel-card panel-card--dim">
+            <p class="eyebrow">İşlem Rotaları</p>
+            <p style="font-size:.82rem;color:var(--muted);margin:6px 0 10px;">
+                Bu ekranlar veya dis sistemler asagidaki rotalari kullanarak islem tetikleyebilir.
+            </p>
+            <div class="api-route-list">
+                <div class="api-route">
+                    <span class="api-method api-method--get">GET</span>
+                    <span class="api-path">/providers/configure/@Model.ProviderCode</span>
+                    <span class="api-desc">Ayarlari goster</span>
+                </div>
+                <div class="api-route">
+                    <span class="api-method api-method--post">POST</span>
+                    <span class="api-path">/providers/configure</span>
+                    <span class="api-desc">Ayarlari kaydet</span>
+                </div>
+                <div class="api-route">
+                    <span class="api-method api-method--get">GET</span>
+                    <span class="api-path">/shipments</span>
+                    <span class="api-desc">Gonderi listesi</span>
+                </div>
+                <div class="api-route">
+                    <span class="api-method api-method--get">GET</span>
+                    <span class="api-path">/shipments/detail?shipmentReference=&#123;ref&#125;</span>
+                    <span class="api-desc">Gonderi detayi</span>
+                </div>
+                <div class="api-route">
+                    <span class="api-method api-method--post">POST</span>
+                    <span class="api-path">/shipments/refresh</span>
+                    <span class="api-desc">Durum guncelle</span>
+                </div>
+                <div class="api-route">
+                    <span class="api-method api-method--post">POST</span>
+                    <span class="api-path">/shipments/cancel</span>
+                    <span class="api-desc">Gonderi iptal</span>
+                </div>
+            </div>
+        </section>
+
+    </aside>
+</div>
+
+@section Scripts {
+    <style>
+        /* ── Wizard ──────────────────────────────────────────────── */
+        .prov-wizard { display:flex; flex-direction:column; gap:18px; }
+        .prov-stepper {
+            display:grid;
+            grid-template-columns:repeat(4, 1fr);
+            gap:8px;
+            padding:14px;
+            border-radius:10px;
+            background:rgba(107,156,248,.04);
+            border:1px solid var(--border);
+        }
+        .prov-step {
+            display:flex; align-items:center; gap:10px;
+            padding:10px 12px;
+            border-radius:8px;
+            border:1px solid transparent;
+            background:rgba(125,141,184,.05);
+            position:relative;
+            transition:background .18s, border-color .18s, transform .18s;
+            cursor:default;
+        }
+        .prov-step + .prov-step::before {
+            content:"›";
+            position:absolute; left:-10px; top:50%;
+            transform:translateY(-50%);
+            color:var(--muted); font-size:1.1rem; opacity:.6;
+        }
+        .prov-step.is-active {
+            background:rgba(107,156,248,.12);
+            border-color:rgba(107,156,248,.4);
+        }
+        .prov-step.is-done {
+            background:rgba(39,174,96,.08);
+            border-color:rgba(39,174,96,.25);
+        }
+        .ps-num {
+            width:30px; height:30px; flex-shrink:0;
+            border-radius:50%;
+            background:var(--border);
+            color:var(--muted);
+            display:flex; align-items:center; justify-content:center;
+            font-weight:700; font-size:.92rem;
+        }
+        .prov-step.is-active .ps-num { background:#6b9cf8; color:#fff; }
+        .prov-step.is-done .ps-num { background:#27ae60; color:#fff; font-size:0; }
+        .prov-step.is-done .ps-num::before { content:"✓"; font-size:.9rem; font-weight:700; }
+        .ps-text { display:flex; flex-direction:column; line-height:1.2; min-width:0; }
+        .ps-text strong { font-size:.86rem; color:var(--text); }
+        .ps-text span { font-size:.74rem; color:var(--muted); }
+
+        .prov-pane { display:none; animation:provFade .22s ease-out; }
+        .prov-pane.is-active { display:flex; flex-direction:column; gap:14px; }
+        @@keyframes provFade {
+            from { opacity:0; transform:translateY(4px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .prov-pane-head h3 { margin:0 0 4px; font-size:1.05rem; }
+        .prov-pane-head p { margin:0; font-size:.86rem; color:var(--muted); }
+
+        .prov-empty {
+            padding:14px; border-radius:8px;
+            background:rgba(125,141,184,.06);
+            border:1px dashed var(--border);
+            color:var(--muted); font-size:.88rem;
+        }
+
+        .prov-summary {
+            display:grid; grid-template-columns:repeat(2,1fr); gap:8px 16px;
+            padding:12px 14px; border-radius:8px;
+            background:rgba(39,174,96,.05);
+            border:1px solid rgba(39,174,96,.2);
+        }
+        .prov-summary-row { display:flex; justify-content:space-between; gap:10px; font-size:.86rem; }
+        .prov-summary-row span { color:var(--muted); }
+
+        .prov-nav {
+            display:flex; align-items:center; gap:10px;
+            padding-top:10px;
+            border-top:1px solid var(--border);
+        }
+        .prov-nav .prov-progress { margin-left:auto; margin-right:6px; font-size:.82rem; color:var(--muted); }
+
+        @@media (max-width: 720px) {
+            .prov-stepper { grid-template-columns:repeat(2, 1fr); }
+            .prov-step + .prov-step::before { display:none; }
+        }
+
+        /* ── Entegrasyon Akisi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .op-flow-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .op-flow-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(107,156,248,.03);
+        }
+        .op-flow-row.imp-none {
+            background: rgba(203,92,45,.04);
+            border-color: rgba(203,92,45,.2);
+            opacity: .8;
+        }
+        .op-flow-row.imp-sim {
+            background: rgba(125,141,184,.04);
+            border-color: rgba(125,141,184,.18);
+        }
+        .op-flow-row.imp-auto {
+            background: rgba(39,174,96,.04);
+            border-color: rgba(39,174,96,.2);
+        }
+        .op-flow-left {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+        .op-method {
+            display: inline-block;
+            font-size: .68rem;
+            font-weight: 700;
+            padding: 3px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-top: 2px;
+            font-family: monospace;
+        }
+        .mth-post   { background: rgba(52,152,219,.15); color:#4a9fd5; }
+        .mth-get    { background: rgba(39,174,96,.15);  color:#27ae60; }
+        .mth-put    { background: rgba(155,89,182,.15); color:#9b59b6; }
+        .mth-delete { background: rgba(203,92,45,.15);  color:#e05c4e; }
+        .mth-soap   { background: rgba(212,160,23,.15); color:#d4a017; }
+        .mth-sim    { background: rgba(125,141,184,.12);color:#7d8db8; }
+        .mth-none   { background: rgba(203,92,45,.1);   color:#e05c4e; }
+        .op-flow-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .op-name {
+            font-size: .85rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .op-endpoint {
+            font-size: .75rem;
+            color: var(--muted);
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .op-note {
+            font-size: .76rem;
+            color: var(--muted);
+            line-height: 1.4;
+            margin-top: 2px;
+        }
+        .imp-none .op-note { color: #e8a45a; }
+        .op-impl-badge {
+            display: inline-block;
+            font-size: .72rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 20px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            align-self: flex-start;
+        }
+        .op-impl-badge.imp-live {
+            background: rgba(39,174,96,.12);
+            color: #27ae60;
+            border: 1px solid rgba(39,174,96,.3);
+        }
+        .op-impl-badge.imp-sim {
+            background: rgba(125,141,184,.12);
+            color: #7d8db8;
+            border: 1px solid rgba(125,141,184,.25);
+        }
+        .op-impl-badge.imp-none {
+            background: rgba(203,92,45,.1);
+            color: #e05c4e;
+            border: 1px solid rgba(203,92,45,.25);
+        }
+        .op-impl-badge.imp-auto {
+            background: rgba(39,174,96,.08);
+            color: #27ae60;
+            border: 1px solid rgba(39,174,96,.2);
+        }
+
+        /* â”€â”€ Settings Hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+        .settings-hint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .settings-hint-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            gap: 2px 8px;
+            padding: 10px 12px;
+            border-radius: 7px;
+            background: rgba(107,156,248,.04);
+            border: 1px solid var(--border);
+        }
+        .settings-hint-key {
+            grid-column: 1;
+            grid-row: 1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .settings-hint-key code {
+            font-family: monospace;
+            font-size: .84rem;
+            color: #6b9cf8;
+            background: rgba(107,156,248,.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .settings-hint-desc {
+            grid-column: 1;
+            grid-row: 2;
+            font-size: .8rem;
+            color: var(--muted);
+        }
+        .settings-hint-example {
+            grid-column: 2;
+            grid-row: 1 / 3;
+            display: flex;
+            align-items: center;
+        }
+        .copy-hint-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: .74rem;
+            padding: 3px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: color .15s, border-color .15s;
+            white-space: nowrap;
+        }
+        .copy-hint-btn:hover {
+            color: #6b9cf8;
+            border-color: #6b9cf8;
+        }
+        .copy-hint-btn.copied {
+            color: #27ae60;
+            border-color: #27ae60;
+        }
+        .field-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: .78rem;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+        .field-optional {
+            font-size: .75rem;
+            color: var(--muted);
+            font-weight: 400;
+            margin-left: 4px;
+        }
+        .field-required {
+            font-size: .75rem;
+            color: #e8a45a;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+    </style>
+    <script>
+    // ── Provider wizard ─────────────────────────────────────────
+    (function () {
+        var TOTAL = 4;
+        var current = 1;
+
+        // Akıllı başlangıç: hangi alanlar dolu, oradan devam et
+        try {
+            var f = document.getElementById('provForm');
+            if (f) {
+                var hasCreds =
+                    (f.querySelector('[name="ClientCode"]') && f.querySelector('[name="ClientCode"]').value.trim()) ||
+                    (f.querySelector('[name="Username"]') && f.querySelector('[name="Username"]').value.trim()) ||
+                    @(Model.HasStoredPassword ? "true" : "false");
+                var hasApi =
+                    (f.querySelector('[name="EndpointBase"]') && f.querySelector('[name="EndpointBase"]').value.trim()) ||
+                    @(Model.HasStoredApiKey ? "true" : "false");
+                if (hasCreds && hasApi) current = 4;
+                else if (hasCreds) current = 3;
+                else if (@(Model.IsEnabled ? "true" : "false")) current = 2;
+            }
+        } catch (e) { /* yoksay */ }
+
+        var steps = document.querySelectorAll('#provStepper .prov-step');
+        var panes = document.querySelectorAll('.prov-pane');
+        var btnBack = document.getElementById('provBack');
+        var btnNext = document.getElementById('provNext');
+        var btnSave = document.getElementById('provSave');
+        var prog    = document.getElementById('provProgress');
+
+        function render() {
+            steps.forEach(function (s) {
+                var n = parseInt(s.getAttribute('data-step'), 10);
+                s.classList.remove('is-active','is-done');
+                if (n < current) s.classList.add('is-done');
+                else if (n === current) s.classList.add('is-active');
+            });
+            panes.forEach(function (p) {
+                p.classList.toggle('is-active', parseInt(p.getAttribute('data-pane'),10) === current);
+            });
+            btnBack.disabled = (current === 1);
+            if (current === TOTAL) {
+                btnNext.style.display = 'none';
+                btnSave.style.display = '';
+            } else {
+                btnNext.style.display = '';
+                btnSave.style.display = 'none';
+            }
+            prog.textContent = 'Adım ' + current + ' / ' + TOTAL;
+        }
+
+        function validateStep(n) {
+            // Tarayıcı HTML5 validasyonu — required alanlar için
+            var pane = document.querySelector('.prov-pane[data-pane="' + n + '"]');
+            if (!pane) return true;
+            var inputs = pane.querySelectorAll('input, textarea, select');
+            for (var i = 0; i < inputs.length; i++) {
+                if (!inputs[i].checkValidity()) {
+                    inputs[i].reportValidity();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        btnNext.addEventListener('click', function () {
+            if (!validateStep(current)) return;
+            if (current < TOTAL) { current++; render(); }
+        });
+        btnBack.addEventListener('click', function () {
+            if (current > 1) { current--; render(); }
+        });
+
+        // Stepper'a tıklayınca o adıma git (geri için her zaman, ileri için validasyonla)
+        steps.forEach(function (s) {
+            s.style.cursor = 'pointer';
+            s.addEventListener('click', function () {
+                var target = parseInt(s.getAttribute('data-step'), 10);
+                if (target <= current) { current = target; render(); return; }
+                // ileriye doğru — aradaki adımları doğrula
+                for (var k = current; k < target; k++) {
+                    if (!validateStep(k)) return;
+                }
+                current = target;
+                render();
+            });
+        });
+
+        render();
+    }());
+
+    (function () {
+        // "Kopyala" dugmeleri â€” key=value'yi textarea'ya ekle
+        var textarea = document.querySelector('textarea[name="AdditionalSettingsText"]');
+        document.querySelectorAll('.copy-hint-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var value = btn.getAttribute('data-value');
+                if (!textarea) { return; }
+                var current = textarea.value.trimEnd();
+                // Zaten var mi?
+                var key = value.split('=')[0];
+                var lines = current.split('\n').map(function(l){ return l.trim(); });
+                var existing = lines.find(function(l){ return l.startsWith(key + '='); });
+                if (!existing) {
+                    textarea.value = current ? current + '\n' + value : value;
+                    textarea.focus();
+                    // Sona git
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                }
+                btn.textContent = 'Eklendi';
+                btn.classList.add('copied');
+                setTimeout(function () {
+                    btn.textContent = 'Kopyala';
+                    btn.classList.remove('copied');
+                }, 1800);
+            });
+        });
+    }());
+    </script>
+}

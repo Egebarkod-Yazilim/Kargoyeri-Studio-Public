@@ -1,0 +1,150 @@
+﻿@model NotificationCenterViewModel
+@{
+    ViewData["Title"] = "Bildirimler";
+}
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Bildirim Merkezi</p>
+        <h1>@Model.WorkspaceName bildirim kayitlari</h1>
+    </div>
+    <span class="status-pill @(Model.Pagination.TotalCount > 0 ? "status-pill--ready" : "status-pill--pending")">
+        @Model.Pagination.TotalCount kayit
+    </span>
+</section>
+
+<div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <a class="ghost-link" asp-controller="NotificationTemplates" asp-action="Index">Sablonlari Yonet</a>
+</div>
+
+<div class="panel-card" style="margin-bottom:20px;">
+    <form asp-action="Index" method="get" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="Filter_ShipmentReference">Gonderi Referansi</label>
+            <input asp-for="Filter.ShipmentReference" class="form-input" placeholder="SHIP-..." style="width:100%;" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="Filter_Status">Durum</label>
+            <select asp-for="Filter.Status" asp-items="Html.GetEnumSelectList<Kargoyeri.Contracts.Enums.NotificationDeliveryStatusDto>()" class="form-input">
+                <option value="">Hepsi</option>
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="Filter_Channel">Kanal</label>
+            <select asp-for="Filter.Channel" asp-items="Html.GetEnumSelectList<Kargoyeri.Contracts.Enums.NotificationChannelDto>()" class="form-input">
+                <option value="">Hepsi</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button type="submit" class="primary-button">Filtrele</button>
+            <a class="ghost-link" asp-action="Index">Temizle</a>
+        </div>
+    </form>
+</div>
+
+@if (Model.Pagination.TotalCount == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">&#128276;</div>
+        <h2>Henuz bildirim yok</h2>
+        <p>
+            @if (!string.IsNullOrWhiteSpace(Model.Filter.ShipmentReference) || Model.Filter.Status.HasValue || Model.Filter.Channel.HasValue)
+            {
+                <span>Bu filtreyle eslesen bildirim bulunamadi. Filtreyi temizleyip tekrar deneyin.</span>
+            }
+            else
+            {
+                <span>Kargo operasyonlari basladiginda webhook, e-posta ve SMS bildirimleri burada gorunecek.</span>
+            }
+        </p>
+        @if (!string.IsNullOrWhiteSpace(Model.Filter.ShipmentReference) || Model.Filter.Status.HasValue || Model.Filter.Channel.HasValue)
+        {
+            <a class="ghost-link" asp-action="Index">Filtreyi Temizle</a>
+        }
+        else
+        {
+            <a class="ghost-link" asp-controller="Shipments" asp-action="Index">Gonderi Olustur</a>
+        }
+    </div>
+}
+else
+{
+    <div class="table-shell">
+        <table class="studio-table">
+            <thead>
+                <tr>
+                    <th>Olay</th>
+                    <th>Kanal</th>
+                    <th>@L["Label_Status"]</th>
+                    <th>Hedef</th>
+                    <th>Mesaj / Hata</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Notifications)
+                {
+                    var isFailed = item.Status == Kargoyeri.Contracts.Enums.NotificationDeliveryStatusDto.Failed;
+                    var isOk = item.Status == Kargoyeri.Contracts.Enums.NotificationDeliveryStatusDto.Delivered;
+                    <tr>
+                        <td>@item.EventType</td>
+                        <td><span class="cap-tag" style="font-size:.78rem;">@item.Channel</span></td>
+                        <td>
+                            <span class="status-pill @(isOk ? "status-pill--ready" : isFailed ? "status-pill--error" : "status-pill--pending")" style="font-size:.75rem;">
+                                @item.Status
+                            </span>
+                        </td>
+                        <td style="font-size:.85rem;color:var(--muted);">@item.Address</td>
+                        <td style="font-size:.85rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                            title="@(isFailed && item.ErrorMessage != null ? item.ErrorMessage : item.Body)">
+                            @if (isFailed && !string.IsNullOrWhiteSpace(item.ErrorMessage))
+                            {
+                                <span style="color:var(--danger,#e05252);">@item.ErrorMessage</span>
+                            }
+                            else
+                            {
+                                @item.Body
+                            }
+                        </td>
+                        <td style="text-align:right;">
+                            @if (isFailed)
+                            {
+                                <form asp-action="Retry" method="post" style="margin:0;display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="ghost-link" style="font-size:.78rem;color:var(--brand);"
+                                            onclick="return confirm('Bu bildirimi yeniden gondermek istiyor musunuz?')">
+                                        Yeniden Dene
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Pagination.TotalPages > 1)
+    {
+        <div class="pagination-bar">
+            @if (Model.Pagination.HasPrev)
+            {
+                <a class="ghost-link" asp-action="Index"
+                   asp-route-page="@(Model.Pagination.Page - 1)"
+                   asp-route-ShipmentReference="@Model.Filter.ShipmentReference"
+                   asp-route-Status="@Model.Filter.Status"
+                   asp-route-Channel="@Model.Filter.Channel">&larr; Onceki</a>
+            }
+            <span class="pagination-info">Sayfa @Model.Pagination.Page / @Model.Pagination.TotalPages &nbsp;&middot;&nbsp; @Model.Pagination.TotalCount kayit</span>
+            @if (Model.Pagination.HasNext)
+            {
+                <a class="ghost-link" asp-action="Index"
+                   asp-route-page="@(Model.Pagination.Page + 1)"
+                   asp-route-ShipmentReference="@Model.Filter.ShipmentReference"
+                   asp-route-Status="@Model.Filter.Status"
+                   asp-route-Channel="@Model.Filter.Channel">Sonraki &rarr;</a>
+            }
+        </div>
+    }
+}

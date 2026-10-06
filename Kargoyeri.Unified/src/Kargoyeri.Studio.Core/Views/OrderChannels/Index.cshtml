@@ -1,0 +1,231 @@
+@using Kargoyeri.Studio.Core.Controllers
+@using Kargoyeri.Studio.Core.Infrastructure.OrderChannels
+@model OrderChannelsViewModel
+@{
+    ViewData["Title"] = "Sipariş Kaynakları";
+    var grouped = Model.Rows.GroupBy(r => r.Descriptor.Group);
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">@Model.TenantName</p>
+        <h1>Sipariş Kaynakları</h1>
+        <p style="color:var(--muted);max-width:720px;">
+            Müşteri siparişleri 4 farklı kaynaktan gelebilir: <strong>Manuel giriş</strong> (her zaman aktif),
+            <strong>Pazaryeri API'leri</strong>, <strong>NopCommerce</strong> ve <strong>Gömülü Mini-Shop</strong>.
+            Aşağıdaki kanallardan dilediğinizi açıp kapatabilirsiniz; birden fazlasını aynı anda kullanmak mümkündür.
+        </p>
+    </div>
+    <form asp-action="SyncAll" method="post" style="align-self:flex-end;">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="primary-button">Aktif tümünü senkronize et</button>
+    </form>
+</div>
+
+@if (TempData["StudioMessage"] is string msg)
+{
+    <div class="flash" style="margin-bottom:16px;">@msg</div>
+}
+
+@foreach (var group in grouped)
+{
+    <h2 style="font-size:1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 0 10px;">
+        @group.Key
+    </h2>
+
+    <div class="channel-grid">
+        @foreach (var row in group)
+        {
+            var d = row.Descriptor;
+            var s = row.State;
+            var stageBadge = d.Stage switch
+            {
+                OrderChannelStage.Live => ("Canlı", "stage-live"),
+                OrderChannelStage.Simulation => ("Simülasyon", "stage-sim"),
+                OrderChannelStage.ComingSoon => ("Yakında", "stage-soon"),
+                _ => ("?", "")
+            };
+            var disabled = d.Stage == OrderChannelStage.ComingSoon;
+
+            <section class="panel-card channel-card @(disabled ? "channel-card--disabled" : "")">
+                <header class="channel-card-head">
+                    <div>
+                        <h3 style="margin:0 0 2px;">
+                            @if (!disabled)
+                            {
+                                <a asp-action="Configure" asp-route-channel="@d.Code" style="color:inherit;text-decoration:none;">@d.DisplayName &rsaquo;</a>
+                            }
+                            else
+                            {
+                                @d.DisplayName
+                            }
+                        </h3>
+                        <p style="margin:0;font-size:.82rem;color:var(--muted);">@d.Tagline</p>
+                    </div>
+                    <span class="stage-badge @stageBadge.Item2">@stageBadge.Item1</span>
+                </header>
+
+                @if (s.Enabled && s.LastSyncUtc.HasValue)
+                {
+                    <p style="font-size:.78rem;color:#27ae60;margin:8px 0 0;">
+                        Son sync: @s.LastSyncUtc.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </p>
+                }
+
+                @if (disabled)
+                {
+                    <p style="font-size:.85rem;color:var(--muted);margin:14px 0 4px;">
+                        Bu kanal henüz aktif değildir. UI hazır, backend ileriki sürümde eklenecek.
+                    </p>
+                }
+                else
+                {
+                    <form asp-action="Save" method="post" class="channel-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Channel" value="@d.Code" />
+
+                        <label class="toggle-row-v2" style="margin:10px 0;">
+                            <div>
+                                <strong>Bu kanalı aktif kullan</strong>
+                                <p style="margin:2px 0 0;font-size:.8rem;color:var(--muted);">
+                                    Kapatınca bu kanaldan otomatik çekim yapılmaz.
+                                </p>
+                            </div>
+                            <input type="checkbox" name="Enabled" value="true" @(s.Enabled ? "checked" : "")
+                                   style="width:20px;height:20px;" />
+                        </label>
+
+                        @foreach (var field in d.Fields)
+                        {
+                            var fieldValue = s.Fields.TryGetValue(field.Key, out var v) ? v : "";
+                            var hasStored = field.Secret && !string.IsNullOrEmpty(fieldValue);
+
+                            <label style="display:block;margin-bottom:10px;">
+                                <span>
+                                    @field.Label
+                                    @if (field.Required) { <span class="field-required">zorunlu</span> }
+                                    else { <span class="field-optional">opsiyonel</span> }
+                                </span>
+                                @if (field.Secret)
+                                {
+                                    <input type="password" autocomplete="new-password"
+                                           name="Fields[@field.Key]"
+                                           placeholder="@(hasStored ? "(kayıtlı — değiştirmek için yeni değer gir)" : field.Placeholder)" />
+                                    @if (hasStored)
+                                    {
+                                        <small class="field-hint" style="color:#16a34a;">&#10003; Değer kayıtlı. Boş bırakırsan korunur.</small>
+                                    }
+                                }
+                                else
+                                {
+                                    <input type="text" name="Fields[@field.Key]"
+                                           value="@fieldValue" placeholder="@field.Placeholder" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(field.Hint))
+                                {
+                                    <small class="field-hint">@field.Hint</small>
+                                }
+                            </label>
+                        }
+
+                        <label style="display:block;margin-bottom:14px;">
+                            <span>Varsayılan kargo firması <span class="field-optional">opsiyonel</span></span>
+                            <input type="text" name="DefaultProvider"
+                                   value="@s.DefaultProvider"
+                                   placeholder="ornk: aras, mng, yurtici" />
+                            <small class="field-hint">Bu kanaldan gelen siparişler bu kargo firması ile yönlendirilir.</small>
+                        </label>
+
+                        <div class="action-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="submit" class="primary-button" style="font-size:.85rem;">Kaydet</button>
+                        </div>
+                    </form>
+
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <form asp-action="Test" asp-route-channel="@d.Code" method="post" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="ghost-link" style="font-size:.78rem;">Bağlantı Testi</button>
+                        </form>
+                        @if (s.Enabled)
+                        {
+                            <form asp-action="Sync" asp-route-channel="@d.Code" method="post" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="secondary-button" style="font-size:.78rem;">Şimdi Senkronize Et</button>
+                            </form>
+                        }
+                        @if (!string.IsNullOrEmpty(d.DocsUrl))
+                        {
+                            <a href="@d.DocsUrl" target="_blank" rel="noopener" class="ghost-link" style="font-size:.78rem;">API Dokümanı &rarr;</a>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@if (Model.RecentRuns.Any())
+{
+    <section class="panel-card" style="margin-top:24px;">
+        <h3 style="margin:0 0 10px;">Son Senkronizasyon Çalıştırmaları</h3>
+        <table class="data-table" style="font-size:.85rem;">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Kanal</th>
+                    <th>Durum</th>
+                    <th>Çekilen</th>
+                    <th>Mesaj</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.RecentRuns)
+                {
+                    <tr>
+                        <td>@r.StartedAtUtc.ToLocalTime().ToString("dd.MM HH:mm:ss")</td>
+                        <td>@(OrderChannelCatalog.Find(r.Channel)?.DisplayName ?? r.Channel.ToString())</td>
+                        <td>@(r.Success ? "OK" : "Hata")@(r.IsSimulation ? " (sim)" : "")</td>
+                        <td>@r.FetchedCount</td>
+                        <td style="color:var(--muted);">@r.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@section Scripts {
+    <style>
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 14px;
+        }
+        .channel-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+        .channel-card--disabled {
+            opacity: .65;
+        }
+        .stage-badge {
+            font-size: .7rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .stage-live { background: rgba(39,174,96,.12); color:#27ae60; border:1px solid rgba(39,174,96,.3); }
+        .stage-sim  { background: rgba(212,160,23,.12); color:#d4a017; border:1px solid rgba(212,160,23,.3); }
+        .stage-soon { background: rgba(125,141,184,.12); color:#7d8db8; border:1px solid rgba(125,141,184,.25); }
+        .channel-form input[type="text"], .channel-form input[type="password"] {
+            width: 100%; padding:6px 8px; font-size:.85rem;
+        }
+        .field-hint { display:block;margin-top:4px;font-size:.76rem;color:var(--muted); }
+        .field-required { font-size:.7rem;color:#e8a45a;font-weight:600;margin-left:4px; }
+        .field-optional { font-size:.7rem;color:var(--muted);margin-left:4px; }
+    </style>
+}

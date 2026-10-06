@@ -1,0 +1,140 @@
+﻿@model AuditLogViewModel
+@{
+    ViewData["Title"] = "Audit Log";
+    bool isFiltered = !string.IsNullOrWhiteSpace(Model.ShipmentRef);
+}
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Audit Log</p>
+        <h1>@(isFiltered ? $"{Model.ShipmentRef} â€” Operasyon Kayitlari" : "Tum Gonderi Operasyon Kayitlari")</h1>
+    </div>
+    <div style="display:flex;gap:8px;">
+        @if (isFiltered)
+        {
+            <a class="ghost-link" asp-action="Index">Tum Kayitlara Don</a>
+        }
+        <a class="ghost-link"
+           asp-action="ExportPackage"
+           asp-route-shipmentRef="@Model.ShipmentRef">
+            PDF + JSON Paketi
+        </a>
+        <a class="primary-button"
+           asp-action="Export"
+           asp-route-shipmentRef="@Model.ShipmentRef"
+           style="background:#16a34a;border-color:#16a34a;">CSV Indir</a>
+    </div>
+</section>
+
+<div class="panel-card" style="margin-bottom:20px;">
+    <form asp-action="Index" method="get" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:200px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="shipmentRef">Gonderi Referansi</label>
+            <input type="text" id="shipmentRef" name="shipmentRef" value="@Model.ShipmentRef" placeholder="SHIP-... veya ORD-..." class="form-input" style="width:100%;" />
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button type="submit" class="primary-button">@L["Action_Search"]</button>
+            @if (isFiltered)
+            {
+                <a class="ghost-link" asp-action="Index">Temizle</a>
+            }
+        </div>
+    </form>
+</div>
+
+@if (isFiltered)
+{
+    @if (!Model.Logs.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">&#128203;</div>
+            <h2>Log bulunamadi</h2>
+            <p>@Model.ShipmentRef icin operasyon kaydi yok ya da bu gonderi bu workspace'e ait degil.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="timeline" style="max-width:900px;">
+            @foreach (var log in Model.Logs)
+            {
+                <li style="background:var(--panel);border-radius:16px;padding:14px 18px;margin-bottom:10px;border:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <strong>@log.Operation</strong>
+                        <span class="status-pill @(log.Severity == "Error" ? "status-pill--pending" : "status-pill--ready")" style="font-size:.72rem;">
+                            @log.Severity
+                        </span>
+                    </div>
+                    <p style="margin:6px 0 0;font-size:.88rem;color:var(--muted);">@log.Message</p>
+                    @if (!string.IsNullOrWhiteSpace(log.ProviderPayload))
+                    {
+                        <details style="margin-top:8px;">
+                            <summary style="cursor:pointer;font-size:.8rem;color:var(--muted);">Provider payload goster</summary>
+                            <pre class="code-block" style="margin-top:8px;font-size:.78rem;">@log.ProviderPayload</pre>
+                        </details>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}
+else
+{
+    @if (!Model.RecentShipments.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-state-icon">&#128203;</div>
+            <h2>Gonderi kaydi yok</h2>
+            <p>Operasyon kayitlarini gormek icin once gonderi olusturun.</p>
+            <a class="ghost-link" asp-controller="Shipments" asp-action="Index">Gonderi Olustur</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-shell">
+            <table class="studio-table">
+                <thead>
+                    <tr>
+                        <th>Gonderi Referansi</th>
+                        <th>Siparis No</th>
+                        <th>Firma</th>
+                        <th>@L["Label_Status"]</th>
+                        <th>Log</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var shipment in Model.RecentShipments)
+                    {
+                        <tr>
+                            <td style="font-size:.85rem;">@shipment.ShipmentReference</td>
+                            <td>@shipment.OrderReference</td>
+                            <td><span class="cap-tag" style="font-size:.75rem;">@shipment.Provider</span></td>
+                            <td>
+                                <span class="status-pill" style="font-size:.72rem;">@shipment.Status</span>
+                            </td>
+                            <td>
+                                <a class="ghost-link" asp-action="Index" asp-route-shipmentRef="@shipment.ShipmentReference">
+                                    Loglari Goster &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.Pagination.TotalPages > 1)
+        {
+            <div class="pagination-bar">
+                @if (Model.Pagination.HasPrev)
+                {
+                    <a class="ghost-link" asp-action="Index" asp-route-page="@(Model.Pagination.Page - 1)">&larr; Onceki</a>
+                }
+                <span class="pagination-info">Sayfa @Model.Pagination.Page / @Model.Pagination.TotalPages &nbsp;&middot;&nbsp; @Model.Pagination.TotalCount gonderi</span>
+                @if (Model.Pagination.HasNext)
+                {
+                    <a class="ghost-link" asp-action="Index" asp-route-page="@(Model.Pagination.Page + 1)">Sonraki &rarr;</a>
+                }
+            </div>
+        }
+    }
+}

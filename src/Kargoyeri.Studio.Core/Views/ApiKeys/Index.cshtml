@@ -1,0 +1,208 @@
+@model ApiKeysPageViewModel
+@{
+    ViewData["Title"] = "API Anahtarları";
+}
+
+<section class="api-keys">
+    <p class="api-keys-lead">
+        REST uçlarını (<code>/api/v1/...</code>) çağırmak için isteğe <code>X-Api-Key</code> başlığı ekleyin.
+        Her anahtar bu çalışma alanına bağlıdır. Kaybolursa veya açığa çıkarsa pasifleştirip yenisini oluşturun.
+    </p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.NewlyCreatedPlainKey))
+    {
+        <div class="api-keys-reveal" role="status">
+            <div>
+                <strong>Yeni anahtar oluşturuldu: @Model.NewlyCreatedName</strong>
+                <p>Bu değeri şimdi kopyalayın. Sayfadan ayrıldıktan sonra bir daha gösterilmez.</p>
+            </div>
+            <div class="api-keys-reveal-row">
+                <code id="new-key-display">@Model.NewlyCreatedPlainKey</code>
+                <button type="button" class="primary-button" id="copy-new-key">Kopyala</button>
+            </div>
+        </div>
+    }
+
+    <div class="panel-card">
+        <h2>Yeni anahtar</h2>
+        <form asp-action="Create" method="post" class="api-keys-form">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Anahtar adı</span>
+                <input name="name" maxlength="80" placeholder="Örnek: Trendyol entegrasyonu" required />
+            </label>
+            <button class="primary-button" type="submit">Oluştur</button>
+        </form>
+    </div>
+
+    <div class="panel-card">
+        <h2>Kayıtlı anahtarlar</h2>
+        @if (Model.Keys.Count == 0)
+        {
+            <p class="api-keys-empty">Henüz anahtar yok. Yukarıdan bir ad verip oluşturabilirsiniz.</p>
+        }
+        else
+        {
+            <div class="table-shell">
+                <table class="studio-table">
+                    <thead>
+                        <tr>
+                            <th>Ad</th>
+                            <th>Ön ek</th>
+                            <th>Oluşturma</th>
+                            <th>Son kullanım</th>
+                            <th>Durum</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var k in Model.Keys.OrderByDescending(x => x.CreatedAt))
+                        {
+                            <tr>
+                                <td>@k.Name</td>
+                                <td><code>@k.Prefix…</code></td>
+                                <td>@k.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                <td>@(k.LastUsedAt is null ? "—" : k.LastUsedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</td>
+                                <td>
+                                    @if (k.IsRevoked)
+                                    {
+                                        <span class="api-keys-status is-off">Pasif</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="api-keys-status is-on">Aktif</span>
+                                    }
+                                </td>
+                                <td class="api-keys-actions">
+                                    @if (!k.IsRevoked)
+                                    {
+                                        <form asp-action="Revoke" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="keyId" value="@k.Id" />
+                                            <button class="ghost-link" type="submit"
+                                                    onclick="return confirm('Bu anahtarı pasifleştirmek istediğinize emin misiniz?');">
+                                                Pasifleştir
+                                            </button>
+                                        </form>
+                                    }
+                                    @if (User.IsInRole(StudioRoles.SuperAdmin))
+                                    {
+                                        <form asp-action="Delete" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="keyId" value="@k.Id" />
+                                            <button class="ghost-link api-keys-delete" type="submit"
+                                                    onclick="return confirm('Anahtarı kalıcı olarak silmek istediğinize emin misiniz?');">
+                                                Sil
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="panel-card api-keys-usage">
+        <h2>Örnek istek</h2>
+        <pre>curl -H "X-Api-Key: kgy_..." https://app/api/v1/shipments</pre>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (function () {
+            var button = document.getElementById("copy-new-key");
+            var display = document.getElementById("new-key-display");
+            if (!button || !display) return;
+            button.addEventListener("click", function () {
+                navigator.clipboard.writeText(display.textContent || "").then(function () {
+                    button.textContent = "Kopyalandı";
+                });
+            });
+        })();
+    </script>
+}
+
+<style>
+    .api-keys { display: flex; flex-direction: column; gap: 16px; max-width: 980px; }
+    .api-keys-lead { color: var(--muted); font-size: .92rem; max-width: 68ch; }
+    .api-keys-lead code, .api-keys code {
+        font-size: .84em;
+        background: var(--panel-dim);
+        border-radius: 4px;
+        padding: 1px 5px;
+    }
+    .api-keys .panel-card h2 { margin-bottom: 14px; }
+    .api-keys-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+    }
+    .api-keys-form label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .api-keys-form label span { font-size: .8rem; color: var(--muted); font-weight: 600; }
+    .api-keys-form input {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        font-size: .92rem;
+        color: var(--text);
+    }
+    .api-keys-form input:focus { outline: none; border-color: var(--brand); }
+    .api-keys-form .primary-button { height: 40px; padding: 0 18px; white-space: nowrap; }
+    .api-keys-empty { color: var(--muted); font-size: .9rem; }
+    .api-keys .table-shell { margin: 0; }
+    .api-keys-status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: .75rem;
+        font-weight: 700;
+    }
+    .api-keys-status.is-on { color: #166534; background: #dcfce7; }
+    .api-keys-status.is-off { color: #991b1b; background: #fee2e2; }
+    .api-keys-actions { text-align: right; white-space: nowrap; }
+    .api-keys-actions form { display: inline; }
+    .api-keys-actions form + form { margin-left: 10px; }
+    .api-keys-delete { color: var(--danger); }
+    .api-keys-reveal {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        border-radius: var(--radius);
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .api-keys-reveal strong { color: #166534; }
+    .api-keys-reveal p { color: #166534; font-size: .88rem; margin-top: 4px; }
+    .api-keys-reveal-row { display: flex; gap: 8px; align-items: center; }
+    .api-keys-reveal-row code {
+        flex: 1;
+        padding: 10px 12px;
+        background: var(--surface);
+        border: 1px solid #86efac;
+        border-radius: 8px;
+        font-size: .88rem;
+        word-break: break-all;
+    }
+    .api-keys-usage pre {
+        margin: 0;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font-size: .82rem;
+        overflow-x: auto;
+    }
+    @@media (max-width: 640px) {
+        .api-keys-form, .api-keys-reveal-row { grid-template-columns: 1fr; display: grid; }
+        .api-keys-form .primary-button { width: 100%; }
+    }
+</style>

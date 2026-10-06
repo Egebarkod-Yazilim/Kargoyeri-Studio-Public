@@ -1,0 +1,243 @@
+@model ReportPageViewModel
+@{
+    ViewData["Title"] = "Raporlar";
+    var report = Model.Report;
+    int GetStatus(string key) => report?.ByStatus.TryGetValue(key, out var v) == true ? v : 0;
+    int delivered    = GetStatus("Delivered");
+    int failed       = GetStatus("Failed");
+    int cancelled    = GetStatus("Cancelled");
+    int inTransit    = GetStatus("InTransit");
+    int provAccepted = GetStatus("ProviderAccepted");
+    int pending      = GetStatus("Pending");
+    int total        = report?.TotalCount ?? 0;
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Analiz</p>
+        <h1 style="margin:0;font-size:1.35rem;">Raporlar</h1>
+    </div>
+</div>
+
+<div class="panel-card" style="margin-bottom:24px;">
+    <form method="get" asp-action="Index" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:5px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="from">Baslangic Tarihi</label>
+            <input type="date" id="from" name="from" value="@Model.Filter.From" class="form-input" style="min-width:160px;" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+            <label style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;" for="to">Bitis Tarihi</label>
+            <input type="date" id="to" name="to" value="@Model.Filter.To" class="form-input" style="min-width:160px;" />
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button type="submit" class="primary-button">Filtrele</button>
+            <a class="secondary-button"
+               asp-action="Pivot"
+               asp-route-from="@Model.Filter.From"
+               asp-route-to="@Model.Filter.To">Pivot Rapor</a>
+            @if (User.IsInRole(StudioRoles.SuperAdmin))
+            {
+                <a class="ghost-link" asp-action="Widgets">Widgetlar</a>
+            }
+            <a class="secondary-button"
+               asp-action="Cod"
+               asp-route-from="@Model.Filter.From"
+               asp-route-to="@Model.Filter.To">Kapida Odeme Raporu</a>
+            @if (report != null && report.TotalCount > 0)
+            {
+                <a class="ghost-link"
+                   asp-action="ExportCsv"
+                   asp-route-from="@Model.Filter.From"
+                   asp-route-to="@Model.Filter.To">
+                    CSV Indir &darr;
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+@if (report == null)
+{
+    <div class="panel-card" style="padding:40px;text-align:center;">
+        <p class="eyebrow">Rapor verisi yuklenemedi.</p>
+        <p style="color:var(--muted);font-size:.88rem;margin:0;">Lutfen tarih araligini secip tekrar deneyin.</p>
+    </div>
+}
+else
+{
+    <div class="metric-strip" style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px;">
+        <div class="metric-card">
+            <span>@L["Label_Total"]</span>
+            <strong>@total</strong>
+        </div>
+        <div class="metric-card">
+            <span>Teslim Edildi</span>
+            <strong style="color:#16a34a;">@delivered</strong>
+        </div>
+        <div class="metric-card">
+            <span>Transitte</span>
+            <strong>@(inTransit + provAccepted)</strong>
+        </div>
+        <div class="metric-card">
+            <span>Beklemede</span>
+            <strong>@pending</strong>
+        </div>
+        <div class="metric-card">
+            <span>Basarisiz</span>
+            <strong style="color:#dc2626;">@failed</strong>
+        </div>
+        <div class="metric-card">
+            <span>İptal</span>
+            <strong>@cancelled</strong>
+        </div>
+    </div>
+
+    @if (report.ByProvider.Count == 0)
+    {
+        <div class="panel-card" style="padding:40px;text-align:center;">
+            <p class="eyebrow" style="margin-bottom:8px;">Secilen tarih araliginda gonderi bulunamadi.</p>
+            <p style="color:var(--muted);font-size:.88rem;margin:0;">
+                @Model.Filter.From &rarr; @Model.Filter.To
+            </p>
+        </div>
+    }
+    else
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px;">
+            @foreach (var row in report.ByProvider)
+            {
+                var deliveredPct = row.Total == 0 ? 0 : (int)Math.Round((double)row.Delivered / row.Total * 100);
+                var inTransitPct = row.Total == 0 ? 0 : (int)Math.Round((double)row.InTransit / row.Total * 100);
+                var failedPct    = row.Total == 0 ? 0 : (int)Math.Round((double)row.Failed    / row.Total * 100);
+                var pendingPct   = row.Total == 0 ? 0 : Math.Max(0, 100 - deliveredPct - inTransitPct - failedPct);
+                var barColor     = row.SuccessRate >= 80 ? "#16a34a" : row.SuccessRate >= 50 ? "#d97706" : "#dc2626";
+                <div class="panel-card" style="padding:16px 18px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <span class="cap-tag" style="font-size:.8rem;">@row.Provider</span>
+                        <strong style="font-size:.9rem;">@row.Total gonderi</strong>
+                    </div>
+                    <div style="display:flex;height:8px;border-radius:6px;overflow:hidden;gap:1px;margin-bottom:10px;background:var(--border);">
+                        @if (deliveredPct > 0)
+                        {
+                            <div style="width:@(deliveredPct)%;background:#16a34a;" title="Teslim: @row.Delivered"></div>
+                        }
+                        @if (inTransitPct > 0)
+                        {
+                            <div style="width:@(inTransitPct)%;background:#0891b2;" title="Transitte: @row.InTransit"></div>
+                        }
+                        @if (pendingPct > 0)
+                        {
+                            <div style="width:@(pendingPct)%;background:#d97706;" title="Beklemede: @row.Pending"></div>
+                        }
+                        @if (failedPct > 0)
+                        {
+                            <div style="width:@(failedPct)%;background:#dc2626;" title="Basarisiz: @row.Failed"></div>
+                        }
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);">
+                        <span style="color:#16a34a;">&#10003; @row.Delivered teslim</span>
+                        <span style="color:@barColor;font-weight:700;">%@row.SuccessRate.ToString("F0")</span>
+                        @if (row.Failed > 0)
+                        {
+                            <span style="color:#dc2626;">&#10005; @row.Failed hata</span>
+                        }
+                        else
+                        {
+                            <span style="color:var(--muted);">hata yok</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <article class="panel-card" style="margin-bottom:16px;">
+            <div class="section-heading section-heading--tight" style="margin-bottom:16px;">
+                <div>
+                    <p class="eyebrow">Provider Bazinda Ozet</p>
+                    <h2>Firma performansi</h2>
+                </div>
+                <span style="font-size:.82rem;color:var(--muted);">
+                    @Model.Filter.From &mdash; @Model.Filter.To
+                </span>
+            </div>
+            <div class="table-shell">
+                <table class="studio-table">
+                    <thead>
+                        <tr>
+                            <th>Kargo Firmasi</th>
+                            <th style="text-align:right;">@L["Label_Total"]</th>
+                            <th style="text-align:right;">Teslim</th>
+                            <th style="text-align:right;">Transitte</th>
+                            <th style="text-align:right;">Beklemede</th>
+                            <th style="text-align:right;">@L["Status_Failed"]</th>
+                            <th style="text-align:right;">Basari %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in report.ByProvider)
+                        {
+                            var rateClass = row.SuccessRate >= 80 ? "status-pill--ready"
+                                          : row.SuccessRate >= 50 ? ""
+                                          : "status-pill--pending";
+                            <tr>
+                                <td><span class="cap-tag" style="font-size:.78rem;">@row.Provider</span></td>
+                                <td style="text-align:right;font-weight:600;">@row.Total</td>
+                                <td style="text-align:right;color:#16a34a;">@row.Delivered</td>
+                                <td style="text-align:right;">@row.InTransit</td>
+                                <td style="text-align:right;">@row.Pending</td>
+                                <td style="text-align:right;color:#dc2626;">@row.Failed</td>
+                                <td style="text-align:right;">
+                                    <span class="status-pill @rateClass" style="font-size:.73rem;">
+                                        %@row.SuccessRate.ToString("F1")
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:700;border-top:2px solid var(--border);">
+                            <td>@L["Label_Total"]</td>
+                            <td style="text-align:right;">@report.TotalCount</td>
+                            <td style="text-align:right;color:#16a34a;">@delivered</td>
+                            <td style="text-align:right;">@(inTransit + provAccepted)</td>
+                            <td style="text-align:right;">@pending</td>
+                            <td style="text-align:right;color:#dc2626;">@(failed + cancelled)</td>
+                            <td style="text-align:right;">
+                                @{
+                                    var totalRate = total == 0 ? 0 : Math.Round((double)delivered / total * 100, 1);
+                                }
+                                <span class="status-pill @(totalRate >= 80 ? "status-pill--ready" : totalRate >= 50 ? "" : "status-pill--pending")"
+                                      style="font-size:.73rem;">
+                                    %@totalRate.ToString("F1")
+                                </span>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="section-heading section-heading--tight" style="margin-bottom:16px;">
+                <div>
+                    <p class="eyebrow">Durum Dagilimi</p>
+                    <h2>Tum gonderiler</h2>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                @foreach (var kv in report.ByStatus.OrderByDescending(x => x.Value))
+                {
+                    var pct    = total == 0 ? 0 : Math.Round((double)kv.Value / total * 100, 1);
+                    var pillCls = kv.Key.Contains("Delivered") ? "status-pill--ready"
+                                : kv.Key.Contains("Failed") || kv.Key.Contains("Cancel") ? "status-pill--pending"
+                                : "";
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--panel);border-radius:8px;border:1px solid var(--border);">
+                        <span class="status-pill @pillCls" style="font-size:.73rem;">@kv.Key</span>
+                        <strong>@kv.Value</strong>
+                        <span style="font-size:.78rem;color:var(--muted);">(%@pct.ToString("F1"))</span>
+                    </div>
+                }
+            </div>
+        </article>
+    }
+}

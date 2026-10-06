@@ -1,0 +1,109 @@
+@model AccessLoginViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Studio Giris";
+    var adminEnabled = (bool?)ViewData["AdminLoginEnabled"] ?? false;
+    var activeTab = string.IsNullOrWhiteSpace(Model.ActiveTab) ? "code" : Model.ActiveTab;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Kargoyeri Studio</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        .tab-bar { display:flex; gap:4px; margin:18px 0 0; border-bottom:1px solid var(--border, #e5e7eb); }
+        .tab-bar button {
+            background:transparent; border:none; padding:10px 14px; font-size:.88rem;
+            color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+        }
+        .tab-bar button.active { color:var(--text, #111); border-bottom-color:var(--accent, #2563eb); font-weight:600; }
+        .tab-pane { display:none; }
+        .tab-pane.active { display:block; }
+    </style>
+</head>
+<body>
+    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;">
+        <section class="panel-card" style="width:min(100%, 460px);">
+            <p class="eyebrow">Kargoyeri Studio</p>
+            <h1 style="margin:8px 0 10px;">Erisim Girisi</h1>
+            <p class="provider-index-note">
+                Musteri kullanicilari erisim koduyla, sistem yoneticileri e-posta + parola ile giris yapar.
+            </p>
+
+            @if (adminEnabled)
+            {
+                <div class="tab-bar" role="tablist">
+                    <button type="button" id="tab-btn-code"  class="@(activeTab == "code"  ? "active" : "")"
+                            onclick="kgyShowTab('code')">Erisim Kodu</button>
+                    <button type="button" id="tab-btn-admin" class="@(activeTab == "admin" ? "active" : "")"
+                            onclick="kgyShowTab('admin')">Yonetici Girisi</button>
+                </div>
+            }
+
+            <div id="tab-pane-code" class="tab-pane @(activeTab == "code" ? "active" : "")">
+                @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                {
+                    <div class="validation-summary-errors" style="margin-top:18px;">@Model.ErrorMessage</div>
+                }
+
+                <form asp-action="Login" method="post" class="form-grid" style="margin-top:18px;">
+                    <label>
+                        <span>Erisim Kodu</span>
+                        <input asp-for="AccessCode" type="password" autocomplete="current-password" />
+                    </label>
+                    <button class="primary-button" type="submit">Giris Yap</button>
+                </form>
+
+                <div style="margin-top:16px;text-align:center;">
+                    <a asp-action="ResetPassword" style="font-size:.82rem;color:var(--muted);">Sifremi unuttum / Sifre sifirlama token'im var</a>
+                </div>
+
+            </div>
+
+            @if (adminEnabled)
+            {
+                <div id="tab-pane-admin" class="tab-pane @(activeTab == "admin" ? "active" : "")">
+                    @if (!string.IsNullOrWhiteSpace(Model.AdminErrorMessage))
+                    {
+                        <div class="validation-summary-errors" style="margin-top:18px;">@Model.AdminErrorMessage</div>
+                    }
+                    <form asp-action="LoginAdmin" method="post" class="form-grid" style="margin-top:18px;">
+                        <label>
+                            <span>E-posta</span>
+                            <input name="Email" type="email" autocomplete="username" required />
+                        </label>
+                        <label>
+                            <span>Sifre</span>
+                            <input name="Password" type="password" autocomplete="current-password" required />
+                        </label>
+                        <button class="primary-button" type="submit">Yonetici Girisi</button>
+                    </form>
+                </div>
+            }
+        </section>
+    </main>
+
+    <footer style="text-align:center;margin-top:18px;font-size:11px;color:#94a3b8;">
+        Sisteme giris yaparak
+        <a href="/legal/privacy" style="color:#64748b;">KVKK Aydinlatma Metni</a>'ni,
+        <a href="/legal/terms" style="color:#64748b;">Kullanim Sartlari</a>'ni ve
+        <a href="/legal/cookies" style="color:#64748b;">Cerez Politikasi</a>'ni kabul etmis sayilirsiniz.
+    </footer>
+
+    @if (adminEnabled)
+    {
+        <script>
+            function kgyShowTab(name) {
+                ['code', 'admin'].forEach(function (k) {
+                    var btn  = document.getElementById('tab-btn-' + k);
+                    var pane = document.getElementById('tab-pane-' + k);
+                    if (btn)  btn.classList.toggle('active', k === name);
+                    if (pane) pane.classList.toggle('active', k === name);
+                });
+            }
+        </script>
+    }
+</body>
+</html>

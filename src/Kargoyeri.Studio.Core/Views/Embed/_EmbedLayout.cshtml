@@ -1,0 +1,80 @@
+@{
+    Layout = null;
+    var brand = ViewData["BrandName"] as string;
+    var logo = ViewData["BrandLogoUrl"] as string;
+    var accent = ViewData["BrandAccentColor"] as string ?? "#16a34a";
+    var title = ViewData["Title"] as string ?? "Kargo Takip";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title</title>
+    <style>
+        :root { --accent:@accent; }
+        * { box-sizing:border-box; }
+        html, body { margin:0; padding:0; }
+        body {
+            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            background:transparent;
+            color:#0f172a;
+            font-size:14px;
+            line-height:1.5;
+        }
+        .embed-shell {
+            background:#fff;
+            border-radius:12px;
+            padding:18px;
+            box-shadow:0 2px 12px rgba(15,23,42,.06);
+            border:1px solid #e2e8f0;
+            max-width:520px;
+            margin:0 auto;
+        }
+        .embed-brand { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+        .embed-brand img { max-height:32px; max-width:120px; }
+        .embed-brand .name { font-weight:600; color:var(--accent); }
+        .embed-form { display:flex; gap:8px; }
+        .embed-form input {
+            flex:1; padding:10px 12px; border:1px solid #cbd5e1;
+            border-radius:8px; font-size:14px;
+        }
+        .embed-form button {
+            padding:10px 16px; border:0; border-radius:8px;
+            background:var(--accent); color:#fff; font-weight:600; cursor:pointer;
+        }
+        .embed-status {
+            display:inline-block; padding:3px 10px; border-radius:999px;
+            font-size:11px; font-weight:600; background:#dbeafe; color:#1e40af;
+        }
+        .embed-status.success { background:#dcfce7; color:#166534; }
+        .embed-status.danger  { background:#fee2e2; color:#991b1b; }
+        .embed-meta { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin:12px 0; font-size:12px; }
+        .embed-meta .k { color:#64748b; text-transform:uppercase; letter-spacing:.4px; font-size:10px; }
+        .embed-meta .v { color:#0f172a; font-weight:500; }
+        .embed-bar {
+            margin-top:12px; height:5px; border-radius:999px;
+            background:#e2e8f0; overflow:hidden;
+        }
+        .embed-bar .fill {
+            height:100%; background:linear-gradient(90deg,var(--accent),#10b981);
+            transition:width .8s ease;
+        }
+        .embed-empty { text-align:center; padding:24px 12px; color:#64748b; font-size:13px; }
+        .embed-foot { margin-top:12px; font-size:10px; color:#94a3b8; text-align:right; }
+    </style>
+</head>
+<body>
+    <div class="embed-shell">
+        <div class="embed-brand">
+            @if (!string.IsNullOrWhiteSpace(logo))
+            {
+                <img src="@logo" alt="@brand" />
+            }
+            <div class="name">@(string.IsNullOrWhiteSpace(brand) ? "Kargo Takip" : brand)</div>
+        </div>
+        @RenderBody()
+        <div class="embed-foot">Kargoyeri ile guclendirilmistir</div>
+    </div>
+</body>
+</html>

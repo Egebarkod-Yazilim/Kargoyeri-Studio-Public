@@ -1,0 +1,143 @@
+@using Kargoyeri.Domain.Enums
+@using Kargoyeri.Studio.Core.Infrastructure
+@{
+    ViewData["Title"] ??= "Provider Sertifikasyon";
+    var tenants = ViewData["Tenants"] as List<Kargoyeri.Contracts.Dtos.CustomerProfileDto> ?? new();
+    var providers = ViewData["Providers"] as List<CargoProviderType> ?? new();
+    var recent = ViewData["Recent"] as IReadOnlyList<CertificationReport> ?? Array.Empty<CertificationReport>();
+}
+
+<div class="cdash-card" style="padding:18px;margin-bottom:16px;">
+    <h1 style="margin:0 0 6px;">Provider Sertifikasyon Matrix</h1>
+    <p style="color:#64748b;margin:0;">Bir tenant + provider sec ve uctan uca sertifikasyon akisini calistir
+        (auth -> create -> refresh -> cancel). Sonuclar JSON olarak <code>provider-cert/</code> altinda saklanir.</p>
+</div>
+
+<div class="cdash-card" style="padding:18px;margin-bottom:16px;">
+    <h2 style="margin:0 0 12px;font-size:1.1rem;">Yeni sertifikasyon kosusu</h2>
+    <form id="cert-form" onsubmit="return runCert(event)" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+        @Html.AntiForgeryToken()
+        <div>
+            <label style="display:block;font-size:.78rem;color:#475569;font-weight:600;">Tenant</label>
+            <select name="tenantKey" required style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;min-width:240px;">
+                <option value="">-- sec --</option>
+                @foreach (var t in tenants)
+                {
+                    <option value="@t.TenantKey">@t.Name (@t.TenantKey)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label style="display:block;font-size:.78rem;color:#475569;font-weight:600;">Provider</label>
+            <select name="provider" required style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;min-width:200px;">
+                <option value="">-- sec --</option>
+                @foreach (var p in providers)
+                {
+                    <option value="@p">@p</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:#334155;">
+                <input type="checkbox" name="autoCancel" value="true" checked />
+                Test gonderiyi otomatik iptal et
+            </label>
+        </div>
+        <button type="submit" style="padding:9px 18px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer;">
+            Sertifikasyonu calistir
+        </button>
+    </form>
+
+    <div id="cert-result" style="margin-top:18px;display:none;"></div>
+</div>
+
+<div class="cdash-card" style="padding:18px;">
+    <h2 style="margin:0 0 12px;font-size:1.1rem;">Son kosular (7 gun)</h2>
+    @if (recent.Count == 0)
+    {
+        <p style="color:#94a3b8;margin:0;">Henuz sertifikasyon kosusu yok.</p>
+    }
+    else
+    {
+        <table class="cdash-table" style="width:100%;border-collapse:collapse;font-size:.88rem;">
+            <thead>
+                <tr style="text-align:left;background:#f8fafc;">
+                    <th style="padding:8px;">Tarih (UTC)</th>
+                    <th style="padding:8px;">Tenant</th>
+                    <th style="padding:8px;">Provider</th>
+                    <th style="padding:8px;">Sonuc</th>
+                    <th style="padding:8px;">Sure</th>
+                    <th style="padding:8px;">Adimlar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in recent)
+                {
+                    var color = r.OverallSuccess ? "#16a34a" : "#dc2626";
+                    var icon = r.OverallSuccess ? "OK" : "FAIL";
+                    <tr style="border-top:1px solid #e2e8f0;">
+                        <td style="padding:8px;font-family:ui-monospace,monospace;font-size:.82rem;">@r.StartedAtUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td style="padding:8px;">@r.TenantKey</td>
+                        <td style="padding:8px;">@r.Provider</td>
+                        <td style="padding:8px;color:@color;font-weight:700;">@icon</td>
+                        <td style="padding:8px;">@r.TotalDurationMs ms</td>
+                        <td style="padding:8px;font-size:.78rem;">
+                            @foreach (var s in r.Steps)
+                            {
+                                var sc = s.Success ? "#16a34a" : "#dc2626";
+                                <span style="display:inline-block;margin-right:6px;color:@sc;" title="@s.Message">
+                                    @(s.Success ? "OK" : "X") @s.Code
+                                </span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<script>
+async function runCert(ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const fd = new FormData(form);
+    const result = document.getElementById('cert-result');
+    result.style.display = 'block';
+    result.innerHTML = '<p style="color:#64748b;">Calisiyor...</p>';
+
+    try {
+        const res = await fetch('/admin/cert/run', {
+            method: 'POST',
+            body: fd,
+            headers: { 'RequestVerificationToken': fd.get('__RequestVerificationToken') }
+        });
+        if (!res.ok) {
+            result.innerHTML = '<p style="color:#dc2626;">HTTP ' + res.status + ': ' + (await res.text()) + '</p>';
+            return false;
+        }
+        const data = await res.json();
+        const okClr = data.overallSuccess ? '#16a34a' : '#dc2626';
+        let html = '<div style="padding:14px;border:1px solid ' + okClr + ';border-radius:10px;background:#f8fafc;">'
+                 + '<h3 style="margin:0 0 8px;color:' + okClr + ';">'
+                 + (data.overallSuccess ? 'BASARILI' : 'BASARISIZ')
+                 + ' &middot; ' + data.tenantKey + ' / ' + data.provider + '</h3>'
+                 + '<table style="width:100%;border-collapse:collapse;font-size:.88rem;">'
+                 + '<thead><tr><th style="text-align:left;padding:6px;">Adim</th><th style="text-align:left;padding:6px;">Aciklama</th><th style="padding:6px;">Sonuc</th><th style="padding:6px;">Sure</th><th style="text-align:left;padding:6px;">Mesaj</th></tr></thead><tbody>';
+        for (const s of data.steps) {
+            html += '<tr style="border-top:1px solid #e2e8f0;">'
+                  + '<td style="padding:6px;font-family:ui-monospace,monospace;">' + s.code + '</td>'
+                  + '<td style="padding:6px;">' + s.description + '</td>'
+                  + '<td style="padding:6px;color:' + (s.success ? '#16a34a' : '#dc2626') + ';font-weight:700;">' + (s.success ? 'OK' : 'X') + '</td>'
+                  + '<td style="padding:6px;">' + s.durationMs + ' ms</td>'
+                  + '<td style="padding:6px;font-size:.82rem;color:#475569;">' + (s.message || '') + '</td>'
+                  + '</tr>';
+        }
+        html += '</tbody></table></div>';
+        result.innerHTML = html;
+    } catch (err) {
+        result.innerHTML = '<p style="color:#dc2626;">Hata: ' + err.message + '</p>';
+    }
+    return false;
+}
+</script>

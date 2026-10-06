@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <!-- Brand / Layout -->
+  <data name="Brand_Tagline"><value>Kargo ayarlari ve takip paneli</value></data>
+  <data name="Topbar_Label"><value>Firma sec, ayar gir, islemi takip et</value></data>
+  <data name="Session_Admin"><value>Admin oturumu</value></data>
+  <data name="Session_Customer"><value>Musteri oturumu</value></data>
+  <data name="Action_Logout"><value>Cikis Yap</value></data>
+  <data name="Language_Label"><value>Dil</value></data>
+
+  <!-- Navigation -->
+  <data name="Nav_Dashboard"><value>Panel</value></data>
+  <data name="Nav_Integration"><value>Entegrasyon</value></data>
+  <data name="Nav_Providers"><value>Kargo Firmalari</value></data>
+  <data name="Nav_Shipments"><value>Siparisler</value></data>
+  <data name="Nav_BulkCsv"><value>Toplu CSV</value></data>
+  <data name="Nav_Pickup"><value>Kurye Randevu</value></data>
+  <data name="Nav_Reports"><value>Raporlar</value></data>
+  <data name="Nav_Mobile"><value>Mobil</value></data>
+  <data name="Nav_Notifications"><value>Bildirimler</value></data>
+  <data name="Nav_WebhookDelivery"><value>Webhook Teslimat</value></data>
+  <data name="Nav_ApiKeys"><value>API Anahtarlari</value></data>
+  <data name="Nav_Account"><value>Hesabim</value></data>
+  <data name="Nav_Workflow"><value>Workflow</value></data>
+  <data name="Nav_ProviderHealth"><value>Firma Sagligi</value></data>
+  <data name="Nav_Customers"><value>Musteriler</value></data>
+  <data name="Nav_Worker"><value>Worker</value></data>
+  <data name="Nav_Audit"><value>Audit</value></data>
+  <data name="Nav_Billing"><value>Faturalar</value></data>
+  <data name="Nav_Certification"><value>Sertifikasyon</value></data>
+  <data name="Nav_OrderChannels"><value>Sipariş Kaynakları</value></data>
+
+  <!-- Impersonation banner -->
+  <data name="Impersonation_Banner_Prefix"><value>ADMIN GORUNUMU:</value></data>
+  <data name="Impersonation_Banner_Body"><value>Su anda {0} musterisini izliyorsunuz. Yaptiginiz tum islemler audit log'a admin kullanici adiyla kaydedilir.</value></data>
+  <data name="Impersonation_Banner_Since"><value>{0} tarihinde basladi</value></data>
+  <data name="Impersonation_Stop"><value>Admin'e Don</value></data>
+
+  <!-- Common actions -->
+  <data name="Action_Save"><value>Kaydet</value></data>
+  <data name="Action_Cancel"><value>Iptal</value></data>
+  <data name="Action_Delete"><value>Sil</value></data>
+  <data name="Action_Edit"><value>Duzenle</value></data>
+  <data name="Action_Create"><value>Olustur</value></data>
+  <data name="Action_Search"><value>Ara</value></data>
+  <data name="Action_Refresh"><value>Yenile</value></data>
+  <data name="Action_Export"><value>Disa aktar</value></data>
+  <data name="Action_Import"><value>Ice aktar</value></data>
+  <data name="Action_Back"><value>Geri</value></data>
+  <data name="Action_Continue"><value>Devam</value></data>
+  <data name="Action_Confirm"><value>Onayla</value></data>
+  <data name="Action_Close"><value>Kapat</value></data>
+  <data name="Action_Print"><value>Yazdir</value></data>
+  <data name="Action_Download"><value>Indir</value></data>
+  <data name="Action_Upload"><value>Yukle</value></data>
+  <data name="Action_Copy"><value>Kopyala</value></data>
+  <data name="Action_Run"><value>Calistir</value></data>
+  <data name="Action_Retry"><value>Yeniden Dene</value></data>
+
+  <!-- Common labels -->
+  <data name="Label_Status"><value>Durum</value></data>
+  <data name="Label_Date"><value>Tarih</value></data>
+  <data name="Label_CreatedAt"><value>Olusturulma</value></data>
+  <data name="Label_UpdatedAt"><value>Guncellenme</value></data>
+  <data name="Label_TenantKey"><value>Tenant</value></data>
+  <data name="Label_Provider"><value>Saglayici</value></data>
+  <data name="Label_TrackingNumber"><value>Takip No</value></data>
+  <data name="Label_OrderReference"><value>Siparis Referansi</value></data>
+  <data name="Label_Sender"><value>Gonderici</value></data>
+  <data name="Label_Recipient"><value>Alici</value></data>
+  <data name="Label_Phone"><value>Telefon</value></data>
+  <data name="Label_Email"><value>E-posta</value></data>
+  <data name="Label_City"><value>Sehir</value></data>
+  <data name="Label_District"><value>Ilce</value></data>
+  <data name="Label_Address"><value>Adres</value></data>
+  <data name="Label_Weight"><value>Agirlik</value></data>
+  <data name="Label_Desi"><value>Desi</value></data>
+  <data name="Label_Description"><value>Aciklama</value></data>
+  <data name="Label_Total"><value>Toplam</value></data>
+  <data name="Label_Active"><value>Aktif</value></data>
+  <data name="Label_Inactive"><value>Pasif</value></data>
+  <data name="Label_None"><value>Yok</value></data>
+  <data name="Label_All"><value>Tumu</value></data>
+  <data name="Label_Loading"><value>Yukleniyor...</value></data>
+  <data name="Label_Empty"><value>Kayit yok</value></data>
+
+  <!-- Status -->
+  <data name="Status_Pending"><value>Bekliyor</value></data>
+  <data name="Status_InTransit"><value>Yolda</value></data>
+  <data name="Status_Delivered"><value>Teslim Edildi</value></data>
+  <data name="Status_Failed"><value>Basarisiz</value></data>
+  <data name="Status_Cancelled"><value>Iptal Edildi</value></data>
+  <data name="Status_Returned"><value>Iade</value></data>
+  <data name="Status_Healthy"><value>Saglikli</value></data>
+  <data name="Status_Degraded"><value>Yavaslamis</value></data>
+  <data name="Status_Unhealthy"><value>Saglik disi</value></data>
+
+  <!-- Auth / Signup -->
+  <data name="Auth_Login_Title"><value>Giris yap</value></data>
+  <data name="Auth_Login_Submit"><value>Giris</value></data>
+  <data name="Auth_NoAccount"><value>Hesabin yok mu?</value></data>
+  <data name="Auth_Register"><value>Kayit ol</value></data>
+  <data name="Auth_HasAccount"><value>Zaten hesabin var mi?</value></data>
+  <data name="Signup_Title"><value>Kayit Ol</value></data>
+  <data name="Signup_Welcome"><value>Hos geldin!</value></data>
+  <data name="Signup_Lead"><value>Hesabini dakikalar icinde kurabilirsin. E-postani dogruladiktan sonra workspace'ini hazirliyoruz.</value></data>
+  <data name="Signup_Submit"><value>Hesabi Olustur</value></data>
+  <data name="Signup_CheckEmail_Title"><value>E-postani kontrol et</value></data>
+  <data name="Signup_CheckEmail_Body"><value>{0} adresine bir dogrulama linki gonderdik. Hesabini etkinlestirmek icin linke tikla. Link 24 saat icinde gecerli olacak.</value></data>
+  <data name="Signup_Done_Title"><value>Hesabin hazir!</value></data>
+  <data name="Signup_Done_Body"><value>{0} ile hesabin etkinlestirildi. Artik giris yapabilirsin.</value></data>
+  <data name="Signup_WorkspaceCode"><value>Workspace kodu</value></data>
+  <data name="Signup_GoToLogin"><value>Giris ekranina git</value></data>
+
+  <!-- Billing -->
+  <data name="Billing_Title"><value>Faturalar</value></data>
+  <data name="Billing_Period"><value>Donem</value></data>
+  <data name="Billing_BaseFee"><value>Sabit ucret</value></data>
+  <data name="Billing_Usage"><value>Kullanim</value></data>
+  <data name="Billing_Vat"><value>KDV</value></data>
+  <data name="Billing_GrandTotal"><value>Genel toplam</value></data>
+  <data name="Billing_Invoice"><value>Fatura</value></data>
+  <data name="Billing_InvoiceNumber"><value>Fatura No</value></data>
+
+  <!-- Common errors / messages -->
+  <data name="Error_Generic"><value>Beklenmedik bir hata olustu. Lutfen tekrar deneyin.</value></data>
+  <data name="Error_NotFound"><value>Aradiginiz kaynak bulunamadi.</value></data>
+  <data name="Error_Forbidden"><value>Bu islem icin yetkiniz yok.</value></data>
+  <data name="Error_RateLimit"><value>Cok fazla istek. Lutfen birazdan tekrar deneyin.</value></data>
+  <data name="Error_RequiredField"><value>Bu alan zorunludur.</value></data>
+  <data name="Error_InvalidEmail"><value>Gecerli bir e-posta giriniz.</value></data>
+  <data name="Error_InvalidPhone"><value>Gecerli bir telefon numarasi giriniz.</value></data>
+  <data name="Success_Saved"><value>Kaydedildi.</value></data>
+  <data name="Success_Deleted"><value>Silindi.</value></data>
+  <data name="Success_Updated"><value>Guncellendi.</value></data>
+
+  <!-- Provider certification -->
+  <data name="Cert_Title"><value>Provider Sertifikasyon</value></data>
+  <data name="Cert_RunNew"><value>Yeni sertifikasyon kosusu</value></data>
+  <data name="Cert_Run"><value>Sertifikasyonu calistir</value></data>
+  <data name="Cert_AutoCancel"><value>Test gonderiyi otomatik iptal et</value></data>
+  <data name="Cert_Recent"><value>Son kosular</value></data>
+  <data name="Cert_NoRuns"><value>Henuz sertifikasyon kosusu yok.</value></data>
+  <data name="Cert_StepDuration"><value>Sure</value></data>
+  <data name="Cert_StepResult"><value>Sonuc</value></data>
+</root>

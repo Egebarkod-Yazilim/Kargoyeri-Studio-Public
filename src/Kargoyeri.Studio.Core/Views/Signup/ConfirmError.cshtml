@@ -1,0 +1,34 @@
+@{
+    Layout = null;
+    ViewData["Title"] ??= "Dogrulama Hatasi";
+    var reason = ViewData["Reason"] as string ?? "Dogrulama islemi tamamlanamadi.";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Kargoyeri</title>
+    <link rel="stylesheet" href="~/_content/Kargoyeri.Studio.Core/css/site.css" asp-append-version="true" />
+</head>
+<body style="background:linear-gradient(135deg,#fef2f2,#fee2e2);min-height:100vh;display:grid;place-items:center;padding:24px;">
+    <div style="max-width:480px;text-align:center;background:#fff;border-radius:14px;padding:40px 32px;box-shadow:0 10px 30px rgba(15,23,42,.08);border:1px solid #fecaca;">
+        <div style="font-size:64px;margin-bottom:8px;color:#dc2626;">&#9888;</div>
+        <h1 style="color:#7f1d1d;margin:0 0 10px;">@ViewData["Title"]</h1>
+        <p style="color:#475569;font-size:.94rem;line-height:1.5;">
+            @reason
+        </p>
+        <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <a href="/signup" style="display:inline-block;background:#16a34a;color:#fff;padding:11px 22px;border-radius:10px;font-weight:600;text-decoration:none;">
+                Yeniden kayit ol
+            </a>
+            <a href="/access/login" style="display:inline-block;background:#e2e8f0;color:#0f172a;padding:11px 22px;border-radius:10px;font-weight:600;text-decoration:none;">
+                Girise don
+            </a>
+        </div>
+        <p style="color:#94a3b8;font-size:.78rem;margin-top:20px;">
+            Sorun devam ederse <a href="mailto:destek@kargoyeri.com" style="color:#16a34a;">destek@kargoyeri.com</a> ile iletisime gec.
+        </p>
+    </div>
+</body>
+</html>

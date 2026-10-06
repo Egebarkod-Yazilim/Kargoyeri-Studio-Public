@@ -1,0 +1,31 @@
+@model AccessLoginAdminViewModel
+@{
+    Layout = "_LoginShell";
+    ViewData["Title"] = "Giriş";
+    ViewData["AuthTitle"] = "Giriş yap";
+    ViewData["AuthLead"] = "Yönetici hesabınızla kargo operasyonlarına devam edin.";
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="auth-alert" role="alert">@Model.ErrorMessage</div>
+}
+<form asp-controller="Access" asp-action="Login" method="post" class="auth-form">
+    <label>
+        <span>E-posta adresi</span>
+        <span class="auth-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            <input asp-for="Email" type="email" autocomplete="username" placeholder="ornek@firma.com" required autofocus />
+        </span>
+    </label>
+    <label>
+        <span>Şifre</span>
+        <span class="auth-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            <input asp-for="Password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button class="auth-eye" type="button" data-toggle-password aria-label="Şifreyi göster">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+            </button>
+        </span>
+    </label>
+    <button class="auth-submit" type="submit">Giriş yap</button>
+</form>

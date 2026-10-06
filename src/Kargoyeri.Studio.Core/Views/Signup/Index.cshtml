@@ -1,0 +1,457 @@
+@using Kargoyeri.Studio.Core.Infrastructure.OrderChannels
+@model Kargoyeri.Studio.Core.Models.SignupFormViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Kayit Ol";
+    var marketplaces = OrderChannelCatalog.All
+        .Where(c => c.Group == "Pazaryeri")
+        .OrderBy(c => c.Stage == OrderChannelStage.Live ? 0 : 1)
+        .ThenBy(c => c.DisplayName)
+        .ToList();
+    var extraSources = OrderChannelCatalog.All
+        .Where(c => c.Group != "Pazaryeri")
+        .OrderBy(c => c.Stage == OrderChannelStage.ComingSoon ? 1 : 0)
+        .ToList();
+
+    // Hangi adımdan başlayacağız (validation hatası varsa o adımda dur)
+    bool s1Bad = ViewData.ModelState.Keys.Any(k =>
+        (k == nameof(Model.CompanyName) || k == nameof(Model.FullName))
+        && (ViewData.ModelState[k]?.Errors.Count ?? 0) > 0);
+    bool s2Bad = !s1Bad && ViewData.ModelState.Keys.Any(k =>
+        (k == nameof(Model.Email) || k == nameof(Model.Phone) || k == nameof(Model.Vkn))
+        && (ViewData.ModelState[k]?.Errors.Count ?? 0) > 0);
+    bool s4Bad = !s1Bad && !s2Bad && ViewData.ModelState.Keys.Any(k =>
+        k == nameof(Model.AcceptTerms)
+        && (ViewData.ModelState[k]?.Errors.Count ?? 0) > 0);
+    int initialStep = s1Bad ? 1 : (s2Bad ? 2 : (s4Bad ? 4 : 1));
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Kargoyeri</title>
+    <link rel="stylesheet" href="~/_content/Kargoyeri.Studio.Core/css/site.css" asp-append-version="true" />
+    <style>
+        body { background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%); min-height:100vh; }
+        .signup-shell { max-width:780px; margin:0 auto; padding:36px 20px 60px; }
+        .signup-brand { text-align:center; margin-bottom:18px; }
+        .signup-brand .mark {
+            display:inline-block; width:48px; height:48px; background:#16a34a; color:#fff;
+            border-radius:12px; font-weight:800; font-size:1.4rem; line-height:48px;
+        }
+        .signup-card {
+            background:#fff; border-radius:16px; padding:30px 36px;
+            box-shadow:0 12px 40px rgba(15,23,42,.08); border:1px solid #e2e8f0;
+        }
+        .signup-card h1 { margin:0 0 4px; font-size:1.5rem; color:#14532d; }
+        .signup-card .lead { color:#64748b; font-size:.92rem; margin:0 0 22px; }
+
+        /* Stepper */
+        .wz-steps {
+            list-style:none; padding:0; margin:0 0 26px;
+            display:grid; grid-template-columns: repeat(4, 1fr); gap:6px;
+        }
+        .wz-step {
+            position:relative; padding:12px; border-radius:10px;
+            background:#f8fafc; border:1px solid #e2e8f0;
+            text-align:center; cursor:default;
+            transition: all .2s ease;
+        }
+        .wz-step::after {
+            content:""; position:absolute; right:-6px; top:50%;
+            width:0; height:0; border:6px solid transparent; border-left-color:#e2e8f0;
+            transform: translateY(-50%);
+        }
+        .wz-step:last-child::after { display:none; }
+        .wz-num {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:28px; height:28px; border-radius:50%;
+            background:#e2e8f0; color:#64748b; font-weight:700; font-size:.85rem;
+            margin-bottom:6px;
+        }
+        .wz-label { display:block; font-weight:600; font-size:.85rem; color:#334155; }
+        .wz-sub { display:block; font-size:.72rem; color:#94a3b8; margin-top:2px; }
+        .wz-step.is-active {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            border-color:#16a34a;
+            box-shadow: 0 3px 12px rgba(22,163,74,.18);
+        }
+        .wz-step.is-active .wz-num { background:#16a34a; color:#fff; }
+        .wz-step.is-done {
+            background:#ecfdf5; border-color:#86efac; cursor:pointer;
+        }
+        .wz-step.is-done .wz-num { background:#16a34a; color:#fff; font-size:0; }
+        .wz-step.is-done .wz-num::before { content:"✓"; font-size:.95rem; font-weight:700; }
+
+        /* Panes */
+        .wz-pane { display:none; min-height: 280px; }
+        .wz-pane.is-active { display:block; animation: slideIn .25s ease; }
+        @@keyframes slideIn {
+            from { opacity:0; transform: translateY(8px); }
+            to   { opacity:1; transform: none; }
+        }
+
+        .wz-field { margin-bottom:14px; }
+        .wz-field label { display:block; font-size:.8rem; color:#334155; margin-bottom:4px; font-weight:600; }
+        .wz-field input[type=text],
+        .wz-field input[type=email],
+        .wz-field input[type=tel] {
+            width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:9px; font-size:.92rem;
+            box-sizing:border-box;
+        }
+        .wz-field input:focus { outline:none; border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.18); }
+        .field-error { color:#dc2626; font-size:.78rem; margin-top:4px; display:block; }
+
+        /* Marketplace grid */
+        .mp-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:10px; }
+        .mp-card {
+            display:block; padding:12px; border:2px solid #e2e8f0; border-radius:12px;
+            background:#fff; cursor:pointer; position:relative;
+            transition: all .15s ease;
+        }
+        .mp-card:hover { border-color:#86efac; transform: translateY(-1px); }
+        .mp-card input { position:absolute; opacity:0; pointer-events:none; }
+        .mp-card .mp-name { font-weight:700; color:#14532d; font-size:.92rem; }
+        .mp-card .mp-tag { font-size:.74rem; color:#64748b; margin-top:2px; line-height:1.3; }
+        .mp-card .mp-stage {
+            position:absolute; top:8px; right:8px;
+            font-size:.65rem; font-weight:600; padding:2px 6px; border-radius:8px;
+            background:#f1f5f9; color:#64748b;
+        }
+        .mp-card.live .mp-stage { background:#dcfce7; color:#16a34a; }
+        .mp-card.sim .mp-stage { background:#fef3c7; color:#d97706; }
+        .mp-card.soon .mp-stage { background:#e0e7ff; color:#6366f1; }
+        .mp-card.is-checked {
+            border-color:#16a34a; background:#ecfdf5;
+            box-shadow:0 4px 14px rgba(22,163,74,.18);
+        }
+        .mp-card.is-checked::after {
+            content:"✓"; position:absolute; bottom:8px; right:10px;
+            color:#16a34a; font-weight:800; font-size:1rem;
+        }
+        .mp-card.disabled { opacity:.6; cursor:not-allowed; }
+        .mp-card.disabled:hover { transform:none; border-color:#e2e8f0; }
+
+        .summary-box {
+            background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;
+            padding:14px 16px; margin:14px 0;
+        }
+        .summary-box dt { font-size:.74rem; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+        .summary-box dd { margin:2px 0 10px; font-weight:600; color:#14532d; }
+        .summary-box dd:last-child { margin-bottom:0; }
+
+        .signup-checkbox { display:flex; gap:8px; align-items:flex-start; font-size:.84rem; color:#334155; margin:14px 0 18px; }
+
+        .wz-footer {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-top:24px; padding-top:18px; border-top:1px solid #e2e8f0; gap:12px;
+        }
+        .wz-progress { font-size:.85rem; color:#64748b; }
+        .wz-btn {
+            padding:10px 20px; border-radius:9px; font-weight:600; font-size:.9rem;
+            cursor:pointer; border:0;
+        }
+        .wz-btn-primary { background:#16a34a; color:#fff; }
+        .wz-btn-primary:hover { background:#15803d; }
+        .wz-btn-ghost { background:#fff; color:#64748b; border:1px solid #cbd5e1; }
+        .wz-btn-ghost:hover { background:#f8fafc; color:#334155; }
+        .wz-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+        .signup-foot { margin-top:18px; text-align:center; font-size:.84rem; color:#64748b; }
+
+        @@media (max-width: 640px) {
+            .wz-steps { grid-template-columns: 1fr 1fr; gap:4px; }
+            .wz-step::after { display:none; }
+            .signup-card { padding:22px 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-shell">
+        <div class="signup-brand">
+            <span class="mark">KY</span>
+            <h2 style="margin:8px 0 0;color:#14532d;">Kargoyeri</h2>
+        </div>
+        <div class="signup-card">
+            <h1>Hoş geldin!</h1>
+            <p class="lead">Hesabını 4 adımda kuralım. Her adımda bilgilerin saklanır; geri dönüp düzenleyebilirsin.</p>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div asp-validation-summary="ModelOnly" style="background:#fee2e2;color:#991b1b;padding:10px 12px;border-radius:8px;font-size:.84rem;margin-bottom:14px;"></div>
+            }
+
+            <ol class="wz-steps" id="wzSteps">
+                <li class="wz-step" data-step="1">
+                    <span class="wz-num">1</span>
+                    <span class="wz-label">Müşteri Bilgileri</span>
+                    <span class="wz-sub">Firma & yetkili</span>
+                </li>
+                <li class="wz-step" data-step="2">
+                    <span class="wz-num">2</span>
+                    <span class="wz-label">İletişim</span>
+                    <span class="wz-sub">E-posta, telefon, VKN</span>
+                </li>
+                <li class="wz-step" data-step="3">
+                    <span class="wz-num">3</span>
+                    <span class="wz-label">Pazaryerleri</span>
+                    <span class="wz-sub">Sipariş kaynakları</span>
+                </li>
+                <li class="wz-step" data-step="4">
+                    <span class="wz-num">4</span>
+                    <span class="wz-label">Onay</span>
+                    <span class="wz-sub">KVKK & oluştur</span>
+                </li>
+            </ol>
+
+            <form method="post" asp-action="Index" id="signupForm">
+                @Html.AntiForgeryToken()
+
+                <!-- Step 1 — Müşteri Bilgileri -->
+                <div class="wz-pane" data-pane="1">
+                    <h2 style="margin:0 0 6px;color:#14532d;font-size:1.15rem;">Müşteri Bilgileri</h2>
+                    <p style="color:#64748b;font-size:.88rem;margin:0 0 16px;">Firmanı ve yetkili kişiyi tanıtalım.</p>
+
+                    <div class="wz-field">
+                        <label asp-for="CompanyName"></label>
+                        <input asp-for="CompanyName" type="text" autocomplete="organization" data-required="1" />
+                        <span asp-validation-for="CompanyName" class="field-error"></span>
+                    </div>
+                    <div class="wz-field">
+                        <label asp-for="FullName"></label>
+                        <input asp-for="FullName" type="text" autocomplete="name" data-required="1" />
+                        <span asp-validation-for="FullName" class="field-error"></span>
+                    </div>
+                </div>
+
+                <!-- Step 2 — İletişim -->
+                <div class="wz-pane" data-pane="2">
+                    <h2 style="margin:0 0 6px;color:#14532d;font-size:1.15rem;">İletişim Bilgileri</h2>
+                    <p style="color:#64748b;font-size:.88rem;margin:0 0 16px;">Doğrulama e-postası ve hesap iletişimi için.</p>
+
+                    <div class="wz-field">
+                        <label asp-for="Email"></label>
+                        <input asp-for="Email" type="email" autocomplete="email" data-required="1" />
+                        <span asp-validation-for="Email" class="field-error"></span>
+                    </div>
+                    <div class="wz-field">
+                        <label asp-for="Phone"></label>
+                        <input asp-for="Phone" type="tel" autocomplete="tel" />
+                        <span asp-validation-for="Phone" class="field-error"></span>
+                    </div>
+                    <div class="wz-field">
+                        <label asp-for="Vkn"></label>
+                        <input asp-for="Vkn" type="text" maxlength="11" />
+                        <span asp-validation-for="Vkn" class="field-error"></span>
+                    </div>
+                </div>
+
+                <!-- Step 3 — Marketplace seçimi -->
+                <div class="wz-pane" data-pane="3">
+                    <h2 style="margin:0 0 6px;color:#14532d;font-size:1.15rem;">Sipariş Kaynakları</h2>
+                    <p style="color:#64748b;font-size:.88rem;margin:0 0 16px;">
+                        Hangi pazaryerlerinden / kaynaklardan sipariş çekeceksin? Şimdi seçmeden geçebilir, sonra panelden de açabilirsin.
+                        Kart üzerine tıkla.
+                    </p>
+
+                    <h3 style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin:6px 0 8px;">Pazaryerleri</h3>
+                    <div class="mp-grid">
+                        @foreach (var mp in marketplaces)
+                        {
+                            var stageClass = mp.Stage switch
+                            {
+                                OrderChannelStage.Live => "live",
+                                OrderChannelStage.Simulation => "sim",
+                                _ => "soon"
+                            };
+                            var stageLabel = mp.Stage switch
+                            {
+                                OrderChannelStage.Live => "Canlı",
+                                OrderChannelStage.Simulation => "Sim",
+                                _ => "Yakında"
+                            };
+                            var isChecked = Model.SelectedChannels.Contains(mp.Code, StringComparer.OrdinalIgnoreCase);
+                            <label class="mp-card @stageClass @(isChecked ? "is-checked" : "")" data-mp-card="1">
+                                <input type="checkbox" name="SelectedChannels" value="@mp.Code" @(isChecked ? "checked" : "") />
+                                <span class="mp-stage">@stageLabel</span>
+                                <div class="mp-name">@mp.DisplayName</div>
+                                <div class="mp-tag">@mp.Tagline</div>
+                            </label>
+                        }
+                    </div>
+
+                    @if (extraSources.Any())
+                    {
+                        <h3 style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin:18px 0 8px;">Diğer Kaynaklar</h3>
+                        <div class="mp-grid">
+                            @foreach (var src in extraSources)
+                            {
+                                var stageClass = src.Stage switch
+                                {
+                                    OrderChannelStage.Live => "live",
+                                    OrderChannelStage.Simulation => "sim",
+                                    _ => "soon"
+                                };
+                                var stageLabel = src.Stage switch
+                                {
+                                    OrderChannelStage.Live => "Canlı",
+                                    OrderChannelStage.Simulation => "Sim",
+                                    _ => "Yakında"
+                                };
+                                var isSoon = src.Stage == OrderChannelStage.ComingSoon;
+                                var isChecked = Model.SelectedExtraSources.Contains(src.Code, StringComparer.OrdinalIgnoreCase);
+                                <label class="mp-card @stageClass @(isChecked ? "is-checked" : "") @(isSoon ? "disabled" : "")" data-mp-card="@(isSoon ? "0" : "1")">
+                                    <input type="checkbox" name="SelectedExtraSources" value="@src.Code" @(isChecked ? "checked" : "") @(isSoon ? "disabled" : "") />
+                                    <span class="mp-stage">@stageLabel</span>
+                                    <div class="mp-name">@src.DisplayName</div>
+                                    <div class="mp-tag">@src.Tagline</div>
+                                </label>
+                            }
+                        </div>
+                    }
+
+                    <p style="font-size:.78rem;color:#64748b;margin-top:14px;">
+                        💡 API anahtarlarını burada girmiyorsun — hesabın oluştuktan sonra her pazaryeri için adım adım kurulum sihirbazı açılacak.
+                    </p>
+                </div>
+
+                <!-- Step 4 — Onay -->
+                <div class="wz-pane" data-pane="4">
+                    <h2 style="margin:0 0 6px;color:#14532d;font-size:1.15rem;">Onay & Hesabı Oluştur</h2>
+                    <p style="color:#64748b;font-size:.88rem;margin:0 0 16px;">Bilgilerini gözden geçir, sözleşmeyi onayla ve hesabını oluştur.</p>
+
+                    <dl class="summary-box" id="summaryBox">
+                        <dt>Firma</dt><dd id="sumCompany">—</dd>
+                        <dt>Yetkili</dt><dd id="sumFullName">—</dd>
+                        <dt>E-posta</dt><dd id="sumEmail">—</dd>
+                        <dt>Telefon / VKN</dt><dd id="sumPhone">—</dd>
+                        <dt>Seçilen kanallar</dt><dd id="sumChannels">—</dd>
+                    </dl>
+
+                    <label class="signup-checkbox">
+                        <input asp-for="AcceptTerms" type="checkbox" />
+                        <span>
+                            <a href="/legal/terms" target="_blank" style="color:#16a34a;">Üyelik Sözleşmesi</a> ve
+                            <a href="/legal/privacy" target="_blank" style="color:#16a34a;">KVKK Aydınlatma Metni</a>'ni okudum, onaylıyorum.
+                        </span>
+                    </label>
+                    <span asp-validation-for="AcceptTerms" class="field-error"></span>
+
+                    <p style="font-size:.78rem;color:#64748b;margin:6px 0 0;">
+                        ✉️ Hesabını oluşturduktan sonra <strong>e-posta adresine doğrulama bağlantısı</strong> göndereceğiz. 24 saat içinde tıklaman gerekir.
+                    </p>
+                </div>
+
+                <!-- Footer -->
+                <div class="wz-footer">
+                    <button type="button" class="wz-btn wz-btn-ghost" id="wzPrev">&larr; Geri</button>
+                    <span class="wz-progress" id="wzProgress">Adım 1 / 4</span>
+                    <button type="button" class="wz-btn wz-btn-primary" id="wzNext">İleri &rarr;</button>
+                    <button type="submit" class="wz-btn wz-btn-primary" id="wzSubmit" style="display:none;">Hesabı Oluştur ✓</button>
+                </div>
+            </form>
+
+            <div class="signup-foot">
+                Zaten hesabın var mı? <a href="/access/login" style="color:#16a34a;font-weight:600;">Giriş yap</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const TOTAL = 4;
+        let current = @initialStep;
+
+        const stepEls = document.querySelectorAll('.wz-step');
+        const paneEls = document.querySelectorAll('.wz-pane');
+        const btnPrev = document.getElementById('wzPrev');
+        const btnNext = document.getElementById('wzNext');
+        const btnSubmit = document.getElementById('wzSubmit');
+        const progress = document.getElementById('wzProgress');
+
+        function render() {
+            stepEls.forEach((el) => {
+                const n = parseInt(el.getAttribute('data-step'), 10);
+                el.classList.remove('is-active', 'is-done');
+                if (n < current) el.classList.add('is-done');
+                else if (n === current) el.classList.add('is-active');
+            });
+            paneEls.forEach((p) => {
+                p.classList.toggle('is-active', parseInt(p.getAttribute('data-pane'), 10) === current);
+            });
+            btnPrev.style.visibility = current === 1 ? 'hidden' : 'visible';
+            const onLast = current === TOTAL;
+            btnNext.style.display = onLast ? 'none' : '';
+            btnSubmit.style.display = onLast ? '' : 'none';
+            progress.textContent = `Adım ${current} / ${TOTAL}`;
+            if (onLast) refreshSummary();
+        }
+
+        function validateStep(n) {
+            const pane = document.querySelector(`.wz-pane[data-pane="${n}"]`);
+            if (!pane) return true;
+            const inputs = pane.querySelectorAll('input[data-required="1"]');
+            let ok = true;
+            inputs.forEach(inp => {
+                const v = (inp.value || '').trim();
+                if (!v) {
+                    inp.style.borderColor = '#dc2626';
+                    inp.style.boxShadow = '0 0 0 3px rgba(220,38,38,.1)';
+                    ok = false;
+                } else {
+                    inp.style.borderColor = '';
+                    inp.style.boxShadow = '';
+                }
+                if (inp.type === 'email' && v && !/^\S+@@\S+\.\S+$/.test(v)) {
+                    inp.style.borderColor = '#dc2626';
+                    ok = false;
+                }
+            });
+            return ok;
+        }
+
+        function refreshSummary() {
+            const v = (id) => (document.getElementById(id)?.value || '').trim();
+            document.getElementById('sumCompany').textContent  = v('CompanyName') || '—';
+            document.getElementById('sumFullName').textContent = v('FullName') || '—';
+            document.getElementById('sumEmail').textContent    = v('Email') || '—';
+            const ph = v('Phone'); const vk = v('Vkn');
+            document.getElementById('sumPhone').textContent =
+                [ph, vk].filter(Boolean).join(' · ') || '—';
+            const checked = Array.from(document.querySelectorAll('input[name="SelectedChannels"]:checked, input[name="SelectedExtraSources"]:checked'));
+            const labels = checked.map(c => c.closest('.mp-card')?.querySelector('.mp-name')?.textContent.trim()).filter(Boolean);
+            document.getElementById('sumChannels').textContent =
+                labels.length ? labels.join(', ') : 'Seçim yok (sonra ekleyebilirsin)';
+        }
+
+        btnNext.addEventListener('click', () => {
+            if (!validateStep(current)) return;
+            if (current < TOTAL) { current++; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        });
+        btnPrev.addEventListener('click', () => {
+            if (current > 1) { current--; render(); }
+        });
+
+        // Marketplace kart tıklaması — checkbox toggle + visual state
+        document.querySelectorAll('label.mp-card').forEach(card => {
+            const cb = card.querySelector('input[type=checkbox]');
+            if (!cb || cb.disabled) return;
+            cb.addEventListener('change', () => {
+                card.classList.toggle('is-checked', cb.checked);
+            });
+        });
+
+        // Tamamlanmış adıma geri dön
+        stepEls.forEach(el => {
+            el.addEventListener('click', () => {
+                const n = parseInt(el.getAttribute('data-step'), 10);
+                if (n < current) { current = n; render(); }
+            });
+        });
+
+        render();
+    })();
+    </script>
+</body>
+</html>

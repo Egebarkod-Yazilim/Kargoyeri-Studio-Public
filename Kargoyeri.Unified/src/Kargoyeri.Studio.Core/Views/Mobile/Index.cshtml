@@ -1,0 +1,106 @@
+@model MobileOpsPageViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Mobil Operasyon";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Mobil Operasyon</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <style>
+        body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#f8fafc; color:#0f172a; }
+        .shell { max-width:720px; margin:0 auto; padding:20px 16px 90px; }
+        .hero { background:linear-gradient(160deg,#0f172a,#1e3a8a); color:#fff; border-radius:24px; padding:20px; }
+        .hero h1 { margin:4px 0 0; font-size:1.4rem; }
+        .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+        .card, .panel { background:#fff; border-radius:18px; padding:16px; box-shadow:0 8px 30px rgba(15,23,42,.08); }
+        .card span { display:block; color:#64748b; font-size:.78rem; }
+        .card strong { display:block; margin-top:8px; font-size:1.5rem; }
+        .actions { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
+        .action { display:flex; align-items:center; justify-content:center; min-height:56px; border-radius:16px; background:#0f172a; color:#fff; text-decoration:none; font-weight:600; }
+        .action.alt { background:#e2e8f0; color:#0f172a; }
+        .list { display:grid; gap:10px; margin-top:16px; }
+        .list-item { background:#fff; border-radius:16px; padding:14px; border:1px solid #e2e8f0; }
+        .k { font-size:.74rem; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; }
+        .pill { display:inline-flex; padding:5px 10px; border-radius:999px; font-size:.75rem; font-weight:600; background:#e2e8f0; color:#334155; }
+        .pill.bad { background:#fee2e2; color:#991b1b; }
+        .pill.good { background:#dcfce7; color:#166534; }
+        @@media (max-width: 640px) {
+            .cards, .actions { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <div class="k" style="color:#cbd5e1;">@Model.WorkspaceName</div>
+            <h1>Mobil Operasyon</h1>
+            <div style="margin-top:10px;color:#cbd5e1;">Saha kullanimi icin hizli durum ve kisayollar</div>
+        </section>
+
+        <section class="cards">
+            <div class="card">
+                <span>Aktif Gonderi</span>
+                <strong>@Model.ActiveShipmentCount</strong>
+            </div>
+            <div class="card">
+                <span>Bugun Teslim</span>
+                <strong>@Model.DeliveredTodayCount</strong>
+            </div>
+            <div class="card">
+                <span>Takip Gereken</span>
+                <strong>@Model.AlertingShipmentCount</strong>
+            </div>
+        </section>
+
+        <section class="actions">
+            <a class="action" href="/Shipments">Siparisler</a>
+            <a class="action alt" href="/Tracking">Public Takip</a>
+            <a class="action alt" href="/Notifications">Bildirimler</a>
+            <a class="action alt" href="/Providers">Firmalar</a>
+        </section>
+
+        <section class="panel" style="margin-top:18px;">
+            <div class="k">Son Guncellenen Gonderiler</div>
+            <div class="list">
+                @foreach (var shipment in Model.RecentShipments)
+                {
+                    <div class="list-item">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                            <div>
+                                <strong>@shipment.ShipmentReference</strong>
+                                <div style="font-size:.86rem;color:#64748b;margin-top:4px;">@shipment.Provider • @shipment.OrderReference</div>
+                            </div>
+                            <span class="pill">@shipment.Status</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="panel" style="margin-top:18px;">
+            <div class="k">Provider Sagligi</div>
+            <div class="list">
+                @foreach (var provider in Model.ProviderHealth)
+                {
+                    <div class="list-item">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                            <div>
+                                <strong>@provider.ProviderName</strong>
+                                <div style="font-size:.86rem;color:#64748b;margin-top:4px;">
+                                    Success %@provider.SuccessRate.ToString("F0") • P95 @(provider.P95LatencyMs?.ToString() ?? "-") ms
+                                </div>
+                            </div>
+                            <span class="pill @(provider.ErrorRate > 20 ? "bad" : "good")">Err %@provider.ErrorRate.ToString("F0")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</body>
+</html>
