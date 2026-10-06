@@ -1,0 +1,1066 @@
+﻿@model WorkspaceViewModel
+@using Kargoyeri.Studio.Core.Infrastructure.OrderChannels
+@{
+    ViewData["Title"] = "Musteri Entegrasyonu";
+
+    // Multi-channel marketplace catalog (sadece Pazaryeri grubu, Live olanlar)
+    var marketplaceDescriptors = OrderChannelCatalog.All
+        .Where(d => string.Equals(d.Group, "Pazaryeri", StringComparison.OrdinalIgnoreCase))
+        .Where(d => d.Stage != OrderChannelStage.ComingSoon)
+        .ToList();
+
+    // E-ticaret platformlari katalogu (Shopify, WooCommerce, IdeaSoft, Ticimax, NopCommerce)
+    var ecommerceDescriptors = OrderChannelCatalog.All
+        .Where(d => string.Equals(d.Group, "E-Ticaret", StringComparison.OrdinalIgnoreCase))
+        .Where(d => d.Stage != OrderChannelStage.ComingSoon)
+        .ToList();
+
+    string ProviderBrandIcon(string code) => code switch
+    {
+        "aras"            => "ARS",
+        "mng"             => "MNG",
+        "surat"           => "SR",
+        "yurtici"         => "YK",
+        "ups"             => "UPS",
+        "ptt"             => "PTT",
+        "hepsijet"        => "HJ",
+        "trendyolexpress" => "TEX",
+        _                 => code.Length > 0 ? code[..Math.Min(3, code.Length)].ToUpperInvariant() : "?"
+    };
+
+    string ProviderBrandClass(string code) => code switch
+    {
+        "aras" => "ar", "mng" => "mng", "surat" => "sr", "yurtici" => "yk",
+        "ups" => "ups", "ptt" => "ptt", "hepsijet" => "hj", "trendyolexpress" => "tex",
+        _ => "def"
+    };
+
+    string ProviderBrandSubtitle(string code) => code switch
+    {
+        "aras"            => "SOAP — SetOrder / CancelDispatch",
+        "mng"             => "SOAP — SiparisGirisiDetayliV2",
+        "surat"           => "REST — GonderiBarkodOlustur",
+        "yurtici"         => "Simülasyon (kamuya açık API yok)",
+        "ups"             => "OAuth2 + REST",
+        "ptt"             => "SOAP — kabulEkle2",
+        "hepsijet"        => "REST + Token (X-Auth-Token)",
+        "trendyolexpress" => "Depo atama — update-warehouse-information",
+        _                 => "Cargo provider"
+    };
+
+    string MpBrandClass(string code) => code switch
+    {
+        // Pazaryerleri
+        "trendyol" => "is-tr", "hepsiburada" => "is-hb", "n11" => "is-n11",
+        "pazarama" => "is-pz", "ciceksepeti" => "is-cs", "pttavm" => "is-ptt",
+        "modanisa" => "is-mod", "amazon" => "is-amz",
+        // E-Ticaret platformlari
+        "shopify" => "is-shp", "woocommerce" => "is-woo",
+        "ideasoft" => "is-ids", "ticimax" => "is-tcx",
+        "nopcommerce" => "is-nop",
+        _ => "is-def"
+    };
+
+    string MpBrandIcon(string code) => code switch
+    {
+        // Pazaryerleri
+        "trendyol" => "TY", "hepsiburada" => "HB", "n11" => "N11",
+        "pazarama" => "PZ", "ciceksepeti" => "ÇS", "pttavm" => "PTT",
+        "modanisa" => "MD", "amazon" => "AMZ",
+        // E-Ticaret platformlari
+        "shopify" => "SHP", "woocommerce" => "WOO",
+        "ideasoft" => "IDS", "ticimax" => "TCX",
+        "nopcommerce" => "NOP",
+        _ => code.Length > 0 ? code[..Math.Min(3, code.Length)].ToUpperInvariant() : "?"
+    };
+}
+
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Musteri</p>
+        <h1>Kaynak sistem, marketplace ve marka ayarlari</h1>
+    </div>
+    <span class="status-pill @(Model.SourceConfigured ? "status-pill--ready" : "status-pill--pending")">
+        @(Model.SourceConfigured ? "Kaynak Hazir" : "Kaynak Eksik")
+    </span>
+</section>
+
+<div class="split-layout split-layout--wide">
+    <section class="panel-card">
+        <div class="ws-wizard">
+            <div class="ws-stepper" id="wsStepper">
+                <div class="ws-step is-active" data-step="1"><span class="ws-num">1</span><div class="ws-text"><strong>Müşteri</strong><span>Kod &amp; ad</span></div></div>
+                <div class="ws-step" data-step="2"><span class="ws-num">2</span><div class="ws-text"><strong>E-Ticaret</strong><span>Çoklu platform</span></div></div>
+                <div class="ws-step" data-step="3"><span class="ws-num">3</span><div class="ws-text"><strong>Pazaryerleri</strong><span>Çoklu seçim</span></div></div>
+                <div class="ws-step" data-step="4"><span class="ws-num">4</span><div class="ws-text"><strong>Kargo Firmaları</strong><span>Çoklu seçim</span></div></div>
+                <div class="ws-step" data-step="5"><span class="ws-num">5</span><div class="ws-text"><strong>Adres Doğrulama</strong><span>Kontrol kuralları</span></div></div>
+                <div class="ws-step" data-step="6"><span class="ws-num">6</span><div class="ws-text"><strong>Marka</strong><span>White-label</span></div></div>
+                <div class="ws-step" data-step="7"><span class="ws-num">7</span><div class="ws-text"><strong>Bildirim &amp; Kayıt</strong><span>Webhook / mail / sms</span></div></div>
+            </div>
+
+        <form asp-action="Save" method="post" id="wsForm">
+            <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+            <div class="ws-pane is-active" data-pane="1">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>1. Müşteri Bilgisi</h3>
+                    <p class="form-section-desc">Bu panel hangi musteri icin calisacak? Kod degisirse tum kayitlar o musteriye bagli kalir.</p>
+                </div>
+                <div class="form-grid form-grid--dense">
+                    <label>
+                        <span>Musteri Kodu</span>
+                        <input asp-for="Input.CustomerCode" />
+                    </label>
+                    <label>
+                        <span>Musteri Adi</span>
+                        <input asp-for="Input.CustomerName" />
+                    </label>
+                </div>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="2">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>2. E-Ticaret Platformları (Çoklu Seçim)</h3>
+                    <p class="form-section-desc">
+                        Müşterinin kendi e-ticaret sitesi var mı? Shopify, WooCommerce, IdeaSoft, Ticimax veya NopCommerce
+                        kullanıyorsa burada bağlayın — siparişler dakikada bir otomatik çekilir.
+                        Hiçbiri yoksa boş bırakıp <strong>Kaydet</strong> diyebilirsiniz; manuel akış çalışmaya devam eder.
+                        <strong id="ecSelectedCount">0</strong> platform seçildi.
+                    </p>
+                </div>
+
+                <div class="multi-grid">
+                @foreach (var d in ecommerceDescriptors)
+                {
+                    var sel = Model.Input.Marketplaces.TryGetValue(d.Code, out var s) ? s : new MarketplaceSelectionInput();
+                    var brandClass = MpBrandClass(d.Code);
+                    var brandIcon  = MpBrandIcon(d.Code);
+                    <div class="multi-card ec-card @brandClass @(sel.Enabled ? "is-on is-open" : "")" data-multi="ec">
+                        <input type="hidden" name="Marketplaces[@d.Code].Enabled" value="false" />
+                        <label class="multi-card-head">
+                            <input type="checkbox" name="Marketplaces[@d.Code].Enabled" value="true"
+                                   class="multi-card-toggle" @(sel.Enabled ? "checked" : "") />
+                            <div class="multi-logo">@brandIcon</div>
+                            <div class="multi-title">
+                                <strong>@d.DisplayName</strong>
+                                <span>@d.Tagline</span>
+                            </div>
+                            <span class="multi-tick">✓</span>
+                        </label>
+                        <div class="multi-card-body">
+                            <div class="form-grid form-grid--dense">
+                                @foreach (var f in d.Fields)
+                                {
+                                    var val = sel.Fields != null && sel.Fields.TryGetValue(f.Key, out var v) ? v : "";
+                                    <label>
+                                        <span>@f.Label @(f.Required ? "" : "(ops.)")</span>
+                                        @if (f.Secret)
+                                        {
+                                            <input type="password" name="Marketplaces[@d.Code].Fields[@f.Key]"
+                                                   placeholder="@f.Placeholder" autocomplete="new-password" />
+                                        }
+                                        else
+                                        {
+                                            <input type="text" name="Marketplaces[@d.Code].Fields[@f.Key]"
+                                                   value="@val" placeholder="@f.Placeholder" />
+                                        }
+                                        @if (!string.IsNullOrEmpty(f.Hint))
+                                        {
+                                            <small class="field-hint">@f.Hint</small>
+                                        }
+                                    </label>
+                                }
+                                <label>
+                                    <span>Varsayılan Kargo Provider</span>
+                                    <select name="Marketplaces[@d.Code].DefaultProvider">
+                                        <option value="">İlk izinli provider</option>
+                                        @foreach (var prov in Model.AllProviders)
+                                        {
+                                            var selectedAttr = string.Equals(sel.DefaultProvider, prov.Provider.ToString(), StringComparison.OrdinalIgnoreCase) ? "selected" : "";
+                                            <option value="@prov.Provider" selected="@(selectedAttr == "selected")">@prov.DisplayName</option>
+                                        }
+                                    </select>
+                                </label>
+                                @if (!string.IsNullOrEmpty(d.DocsUrl))
+                                {
+                                    <small class="field-hint" style="grid-column:1/-1;color:var(--muted);">
+                                        📖 API dökümanı: <a href="@d.DocsUrl" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">@d.DocsUrl</a>
+                                    </small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                </div>
+
+                <details class="legacy-mp-details" style="margin-top:14px;">
+                    <summary>Legacy / Generic API Bağlantısı (ERP, custom REST, vb.)</summary>
+                    <p style="font-size:.78rem;color:var(--muted);margin-top:10px;">
+                        Yukarıdaki listede olmayan özel bir sistem (kurumsal ERP, custom API) bağlıyorsanız
+                        buradaki generic alanları doldurun. Yukarıdaki kanal kartlarından biri kullanılıyorsa
+                        bu bölümü atlayabilirsiniz.
+                    </p>
+                    <div class="form-grid form-grid--dense" style="margin-top:12px;">
+                        <label>
+                            <span>Sistem Adı</span>
+                            <input asp-for="Input.SourceSystemName" placeholder="Custom ERP / Internal API" />
+                        </label>
+                        <label>
+                            <span>API Adresi</span>
+                            <input asp-for="Input.SourceApiBaseUrl" placeholder="https://api.ornek.com" />
+                        </label>
+                        <label>
+                            <span>API Key</span>
+                            <input asp-for="Input.SourceApiKey" />
+                        </label>
+                        <label>
+                            <span>API Secret</span>
+                            <input asp-for="Input.SourceApiSecret" type="password" autocomplete="new-password" />
+                        </label>
+                        <label>
+                            <span>Kanal Kodu</span>
+                            <input asp-for="Input.SourceChannelCode" placeholder="WEB / MOBILE / POS" />
+                        </label>
+                    </div>
+                </details>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="3">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>3. Pazaryerleri (Çoklu Seçim)</h3>
+                    <p class="form-section-desc">
+                        Müşteri birden fazla pazaryeri kullanabilir. Aktive ettiğiniz her pazaryeri için
+                        kendi alanları açılır; dakikada bir arka planda siparişler çekilir.
+                        <strong id="mpSelectedCount">0</strong> pazaryeri seçildi.
+                    </p>
+                </div>
+
+                <div class="multi-grid">
+                @foreach (var d in marketplaceDescriptors)
+                {
+                    var sel = Model.Input.Marketplaces.TryGetValue(d.Code, out var s) ? s : new MarketplaceSelectionInput();
+                    var brandClass = MpBrandClass(d.Code);
+                    var brandIcon  = MpBrandIcon(d.Code);
+                    <div class="multi-card mp-card @brandClass @(sel.Enabled ? "is-on is-open" : "")" data-multi="mp">
+                        <input type="hidden" name="Marketplaces[@d.Code].Enabled" value="false" />
+                        <label class="multi-card-head">
+                            <input type="checkbox" name="Marketplaces[@d.Code].Enabled" value="true"
+                                   class="multi-card-toggle" @(sel.Enabled ? "checked" : "") />
+                            <div class="multi-logo">@brandIcon</div>
+                            <div class="multi-title">
+                                <strong>@d.DisplayName</strong>
+                                <span>@d.Tagline</span>
+                            </div>
+                            <span class="multi-tick">✓</span>
+                        </label>
+                        <div class="multi-card-body">
+                            <div class="form-grid form-grid--dense">
+                                @foreach (var f in d.Fields)
+                                {
+                                    var val = sel.Fields != null && sel.Fields.TryGetValue(f.Key, out var v) ? v : "";
+                                    <label>
+                                        <span>@f.Label @(f.Required ? "" : "(ops.)")</span>
+                                        @if (f.Secret)
+                                        {
+                                            <input type="password" name="Marketplaces[@d.Code].Fields[@f.Key]"
+                                                   placeholder="@f.Placeholder" autocomplete="new-password" />
+                                        }
+                                        else
+                                        {
+                                            <input type="text" name="Marketplaces[@d.Code].Fields[@f.Key]"
+                                                   value="@val" placeholder="@f.Placeholder" />
+                                        }
+                                        @if (!string.IsNullOrEmpty(f.Hint))
+                                        {
+                                            <small class="field-hint">@f.Hint</small>
+                                        }
+                                    </label>
+                                }
+                                <label>
+                                    <span>Varsayılan Kargo Provider</span>
+                                    <select name="Marketplaces[@d.Code].DefaultProvider">
+                                        <option value="">İlk izinli provider</option>
+                                        @foreach (var prov in Model.AllProviders)
+                                        {
+                                            var selectedAttr = string.Equals(sel.DefaultProvider, prov.Provider.ToString(), StringComparison.OrdinalIgnoreCase) ? "selected" : "";
+                                            <option value="@prov.Provider" selected="@(selectedAttr == "selected")">@prov.DisplayName</option>
+                                        }
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                }
+                </div>
+
+                <details class="legacy-mp-details" style="margin-top:14px;">
+                    <summary>Legacy tek-pazaryeri ayarları (varsayılan gönderici / kanal kodu)</summary>
+                    <div class="form-grid form-grid--dense" style="margin-top:12px;">
+                        <label>
+                            <span>Kanal Kodu</span>
+                            <input asp-for="Input.MarketplaceChannelCode" placeholder="WEB / TR / DEFAULT" />
+                        </label>
+                        <label>
+                            <span>Sync Araligi (dk)</span>
+                            <input asp-for="Input.MarketplaceAutoSyncIntervalMinutes" type="number" min="5" max="720" />
+                        </label>
+                        <label>
+                            <span>Gönderici Adı</span>
+                            <input asp-for="Input.MarketplaceSenderName" />
+                        </label>
+                        <label>
+                            <span>Gönderici Telefon</span>
+                            <input asp-for="Input.MarketplaceSenderPhone" />
+                        </label>
+                        <label>
+                            <span>Gönderici İl</span>
+                            <input asp-for="Input.MarketplaceSenderCity" />
+                        </label>
+                        <label>
+                            <span>Gönderici İlçe</span>
+                            <input asp-for="Input.MarketplaceSenderDistrict" />
+                        </label>
+                        <label class="field-span">
+                            <span>Gönderici Adres</span>
+                            <textarea asp-for="Input.MarketplaceSenderAddress" rows="2"></textarea>
+                        </label>
+                        <label style="flex-direction:row;align-items:center;gap:10px;">
+                            <input asp-for="Input.MarketplaceAutoSyncEnabled" type="checkbox" style="width:auto;" />
+                            <span>Otomatik sipariş çekme açık (legacy yol)</span>
+                        </label>
+                        <input type="hidden" asp-for="Input.MarketplacePlatform" />
+                        <input type="hidden" asp-for="Input.MarketplaceApiBaseUrl" />
+                        <input type="hidden" asp-for="Input.MarketplaceApiKey" />
+                        <input type="hidden" asp-for="Input.MarketplaceApiSecret" />
+                        <input type="hidden" asp-for="Input.MarketplaceStoreId" />
+                        <input type="hidden" asp-for="Input.MarketplaceDefaultProvider" />
+                    </div>
+                </details>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="4">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>4. Kargo Firmaları (Çoklu Seçim)</h3>
+                    <p class="form-section-desc">
+                        Müşteri birden fazla kargo firması ile çalışabilir. Aktive ettiğiniz her firma için
+                        kendine özgü credential alanları açılır. <strong id="cgSelectedCount">0</strong> firma seçildi.
+                    </p>
+                </div>
+
+                <div class="multi-grid">
+                @foreach (var p in Model.AllProviders)
+                {
+                    var pcode = p.Provider.ToString().ToLowerInvariant();
+                    var psel = Model.Input.Providers.TryGetValue(pcode, out var ps) ? ps : new ProviderSelectionInput();
+                    var brand = ProviderBrandClass(pcode);
+                    var icon  = ProviderBrandIcon(pcode);
+                    var subtitle = ProviderBrandSubtitle(pcode);
+                    <div class="multi-card cg-card brand-@brand @(psel.Enabled ? "is-on is-open" : "")" data-multi="cg">
+                        <input type="hidden" name="Providers[@pcode].Enabled" value="false" />
+                        <label class="multi-card-head">
+                            <input type="checkbox" name="Providers[@pcode].Enabled" value="true"
+                                   class="multi-card-toggle" @(psel.Enabled ? "checked" : "") />
+                            <div class="multi-logo">@icon</div>
+                            <div class="multi-title">
+                                <strong>@p.DisplayName</strong>
+                                <span>@subtitle</span>
+                            </div>
+                            <span class="multi-tick">✓</span>
+                        </label>
+                        <div class="multi-card-body">
+                            <div class="form-grid form-grid--dense">
+                                <label>
+                                    <span>@(pcode switch {
+                                        "surat" => "Cari Kodu",
+                                        "ptt" => "Müşteri ID",
+                                        "ups" => "Hesap Numarası",
+                                        "trendyolexpress" => "Satıcı ID",
+                                        "hepsijet" => "Client Code",
+                                        _ => "Müşteri Kodu"
+                                    })</span>
+                                    <input type="text" name="Providers[@pcode].ClientCode" value="@psel.ClientCode" />
+                                </label>
+                                <label>
+                                    <span>@(pcode == "ups" ? "OAuth Client ID" : "Kullanıcı Adı")</span>
+                                    <input type="text" name="Providers[@pcode].Username" value="@psel.Username" />
+                                </label>
+                                <label>
+                                    <span>@(pcode == "ups" ? "OAuth Client Secret" : "Şifre")</span>
+                                    <input type="password" name="Providers[@pcode].Password"
+                                           autocomplete="new-password"
+                                           placeholder="(boş bırakılırsa mevcut korunur)" />
+                                </label>
+                                <label>
+                                    <span>API Key (opsiyonel)</span>
+                                    <input type="password" name="Providers[@pcode].ApiKey"
+                                           autocomplete="new-password"
+                                           placeholder="(boş bırakılırsa mevcut korunur)" />
+                                </label>
+                                <label class="field-span">
+                                    <span>Endpoint Base URL (opsiyonel)</span>
+                                    <input type="text" name="Providers[@pcode].EndpointBase" value="@psel.EndpointBase"
+                                           placeholder="https://..." />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                }
+                </div>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="5">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>5. Adres Doğrulama</h3>
+                    <p class="form-section-desc">Yanlis veya eksik adresleri gonderi olusturmadan once durdurur. Harici servis varsa uzaktan, aksi halde kural bazli kontrol yapilir.</p>
+                </div>
+                <div class="form-grid form-grid--dense">
+                    <label style="flex-direction:row;align-items:center;gap:10px;">
+                        <input asp-for="Input.AddressValidationEnabled" type="checkbox" style="width:auto;" />
+                        <span>Adres dogrulama aktif</span>
+                    </label>
+                    <label style="flex-direction:row;align-items:center;gap:10px;">
+                        <input asp-for="Input.AddressValidationStrictMode" type="checkbox" style="width:auto;" />
+                        <span>Strict mod: hatali adresi engelle</span>
+                    </label>
+                    <label>
+                        <span>Adres Dogrulama API</span>
+                        <input asp-for="Input.AddressValidationApiBaseUrl" placeholder="https://.../validate" />
+                    </label>
+                    <label>
+                        <span>API Key</span>
+                        <input asp-for="Input.AddressValidationApiKey" />
+                    </label>
+                    <label>
+                        <span>API Secret</span>
+                        <input asp-for="Input.AddressValidationApiSecret" type="password" autocomplete="new-password" />
+                    </label>
+                </div>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="6">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>6. White-label / Co-branded</h3>
+                    <p class="form-section-desc">Bayi veya partner odakli kullanimda gorsel kimligi musteriye gore degistirir.</p>
+                </div>
+                <div class="form-grid form-grid--dense">
+                    <label>
+                        <span>Marka Adi</span>
+                        <input asp-for="Input.BrandDisplayName" placeholder="Ornek Lojistik" />
+                    </label>
+                    <label>
+                        <span>Logo URL</span>
+                        <input asp-for="Input.BrandLogoUrl" placeholder="https://..." />
+                    </label>
+                    <label>
+                        <span>Vurgu Rengi</span>
+                        <input asp-for="Input.BrandAccentColor" placeholder="#16A34A" />
+                    </label>
+                    <label>
+                        <span>Partner Etiketi</span>
+                        <input asp-for="Input.BrandPartnerLabel" placeholder="XYZ Bayi Agi icin co-branded surum" />
+                    </label>
+                    <label class="field-span">
+                        <span>Alt Yazi</span>
+                        <input asp-for="Input.BrandFooterText" placeholder="XYZ Lojistik ile guclendirilmistir" />
+                    </label>
+                    <label style="flex-direction:row;align-items:center;gap:10px;">
+                        <input asp-for="Input.BrandHidePoweredBy" type="checkbox" style="width:auto;" />
+                        <span>Powered by metnini gizle</span>
+                    </label>
+                </div>
+            </div>
+            </div>
+
+            <div class="ws-pane" data-pane="7">
+            <div class="form-section">
+                <div class="form-section-head">
+                    <h3>7. Bildirim Hedefleri</h3>
+                    <p class="form-section-desc">Kargo olaylari gerceklestiginde kim bilgilendirilecek? En az biri doldurulursa aktif hale gelir.</p>
+                </div>
+
+                @if (!Model.IsSmtpConfigured)
+                {
+                    <div class="flash flash--warn" style="margin-bottom:12px;font-size:.85rem;">
+                        <strong>SMTP yapilandirilmamis:</strong> Email bildirimleri gonderilemez.
+                        <code>appsettings.json</code> icindeki <code>Smtp</code> bolumunu doldurun.
+                    </div>
+                }
+                @if (!Model.IsNetgsmConfigured)
+                {
+                    <div class="flash flash--warn" style="margin-bottom:12px;font-size:.85rem;">
+                        <strong>Netgsm yapilandirilmamis:</strong> SMS bildirimleri gonderilemez.
+                        <code>appsettings.json</code> icindeki <code>Netgsm</code> bolumunu doldurun.
+                    </div>
+                }
+
+                <div class="form-grid form-grid--dense">
+                    <label>
+                        <span>Webhook URL</span>
+                        <input asp-for="Input.NotificationWebhook" placeholder="https://sisteminiz.com/kargo-hook" />
+                    </label>
+                    <label>
+                        <span>Webhook Secret <small style="color:var(--muted);font-weight:400;">(HMAC-SHA256 imzalama)</small></span>
+                        <input asp-for="Input.WebhookSecret" type="password" autocomplete="new-password"
+                               placeholder="Bos birakilirsa imza eklenmez" />
+                        <small style="color:var(--muted);font-size:.78rem;margin-top:4px;display:block;">
+                            Alici sistemde <code>X-Kargoyeri-Signature: sha256=&lt;hex&gt;</code> header'i dogrulayabilir.
+                        </small>
+                    </label>
+                    <label>
+                        <span>E-Posta <span class="status-pill @(Model.IsSmtpConfigured ? "status-pill--ready" : "status-pill--pending")" style="font-size:.7rem;margin-left:4px;">@(Model.IsSmtpConfigured ? "SMTP Hazir" : "SMTP Eksik")</span></span>
+                        <input asp-for="Input.NotificationEmail" type="email" placeholder="ops@firma.com" />
+                    </label>
+                    <label>
+                        <span>Telefon (SMS) <span class="status-pill @(Model.IsNetgsmConfigured ? "status-pill--ready" : "status-pill--pending")" style="font-size:.7rem;margin-left:4px;">@(Model.IsNetgsmConfigured ? "Netgsm Hazir" : "Netgsm Eksik")</span></span>
+                        <input asp-for="Input.NotificationPhone" placeholder="05xxxxxxxxx" />
+                    </label>
+                </div>
+            </div>
+            </div>
+
+            <div class="ws-nav">
+                <button type="button" class="secondary-button" id="wsBack" disabled>← Geri</button>
+                <span class="ws-progress" id="wsProgress">Adım 1 / 7</span>
+                <button type="button" class="primary-button" id="wsNext">İleri →</button>
+                <button type="submit" class="primary-button" id="wsSave" style="display:none;">Kaydet</button>
+            </div>
+        </form>
+        </div>
+    </section>
+
+    <aside>
+        <section class="panel-card panel-card--dim" style="margin-bottom:16px;">
+            <p class="eyebrow">Aktif Musteri</p>
+            <h2>@Model.CurrentWorkspaceName</h2>
+            <p style="font-size:.85rem;color:var(--muted);">Kod: <strong>@Model.CurrentWorkspaceCode</strong></p>
+            <ul class="clean-list" style="margin-top:12px;">
+                <li>Kaynak entegrasyon: <strong>@(Model.SourceConfigured ? "Hazir" : "Eksik")</strong></li>
+                <li>Marketplace sync: <strong>@(!string.IsNullOrWhiteSpace(Model.Input.MarketplacePlatform) ? Model.Input.MarketplacePlatform : "Kapali")</strong></li>
+                <li>Adres dogrulama: <strong>@(Model.Input.AddressValidationEnabled ? "Aktif" : "Kapali")</strong></li>
+                <li>White-label: <strong>@(!string.IsNullOrWhiteSpace(Model.Input.BrandDisplayName) ? "Hazir" : "Varsayilan")</strong></li>
+                <li>Izin verilen provider: <strong>@(Model.Profile?.AllowedProviders.Count > 0 ? Model.Profile.AllowedProviders.Count.ToString() : "Secim yok")</strong></li>
+                <li>Bildirim hedefi: <strong>@(Model.Profile?.NotificationTargets.Count(x => x.IsEnabled) ?? 0)</strong></li>
+                <li>SMTP: <strong>@(Model.IsSmtpConfigured ? "Hazir" : "Eksik")</strong></li>
+                <li>SMS (Netgsm): <strong>@(Model.IsNetgsmConfigured ? "Hazir" : "Eksik")</strong></li>
+            </ul>
+        </section>
+
+        <section class="panel-card panel-card--dim" style="margin-bottom:16px;">
+            <p class="eyebrow">Marketplace</p>
+            <h2>Senkronizasyon</h2>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;">Kayitli entegrasyon varsa buradan manuel siparis cekebilirsin.</p>
+            <form asp-action="SyncMarketplace" method="post" style="margin-bottom:12px;">
+                @Html.AntiForgeryToken()
+                <button class="secondary-button" type="submit">Simdi Siparis Cek</button>
+            </form>
+            @if (Model.MarketplaceRuns.Any())
+            {
+                <ul class="clean-list clean-list--compact">
+                    @foreach (var run in Model.MarketplaceRuns)
+                    {
+                        <li>
+                            <strong>@run.Platform</strong> @run.StartedAtUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                            <br />
+                            <span style="color:var(--muted);font-size:.8rem;">
+                                Cekilen @run.PulledCount / yeni @run.ImportedCount / atlanan @run.SkippedCount / hata @run.FailedCount
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p style="font-size:.82rem;color:var(--muted);">Henuz sync gecmisi yok.</p>
+            }
+        </section>
+
+        <section class="panel-card">
+            <p class="eyebrow">Kontrol</p>
+            <h2>Kurulum durumu</h2>
+            <div class="checklist-stack" style="margin-top:12px;">
+                @foreach (var item in Model.SetupChecklist)
+                {
+                    <article class="checklist-item @(item.IsDone ? "is-done" : "is-todo")" style="padding:10px 14px;">
+                        <div>
+                            <strong style="font-size:.88rem;">@item.Title</strong>
+                            <p style="font-size:.8rem;">@item.Description</p>
+                        </div>
+                        <span class="status-pill @(item.IsDone ? "status-pill--ready" : "status-pill--pending")" style="font-size:.72rem;white-space:nowrap;">
+                            @(item.IsDone ? "Hazir" : "Eksik")
+                        </span>
+                    </article>
+                }
+            </div>
+        </section>
+    </aside>
+</div>
+
+@* "Erişim Kontrolü" bölümü Wizard Adım 4'e (Kargo Firmaları Çoklu Seçim) tasindi —
+   provider erisim secimi + credential alanlari artik tek yerden yonetiliyor. *@
+
+
+@section Scripts {
+    <style>
+        .ws-wizard { display:flex; flex-direction:column; gap:18px; }
+        .ws-stepper {
+            display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+            padding:12px; border-radius:10px;
+            background:rgba(107,156,248,.04);
+            border:1px solid var(--border);
+        }
+        .ws-step {
+            display:flex; align-items:center; gap:8px;
+            padding:8px 10px; border-radius:8px;
+            border:1px solid transparent;
+            background:rgba(125,141,184,.05);
+            cursor:pointer; position:relative;
+            transition:background .18s, border-color .18s;
+            min-width:0;
+        }
+        .ws-step + .ws-step::before {
+            content:"›"; position:absolute; left:-7px; top:50%;
+            transform:translateY(-50%); color:var(--muted); opacity:.5;
+        }
+        .ws-step.is-active { background:rgba(107,156,248,.12); border-color:rgba(107,156,248,.4); }
+        .ws-step.is-done   { background:rgba(39,174,96,.08);  border-color:rgba(39,174,96,.25); }
+        .ws-num {
+            width:26px; height:26px; flex-shrink:0; border-radius:50%;
+            background:var(--border); color:var(--muted);
+            display:flex; align-items:center; justify-content:center;
+            font-weight:700; font-size:.85rem;
+        }
+        .ws-step.is-active .ws-num { background:#6b9cf8; color:#fff; }
+        .ws-step.is-done   .ws-num { background:#27ae60; color:#fff; font-size:0; }
+        .ws-step.is-done   .ws-num::before { content:"✓"; font-size:.85rem; font-weight:700; }
+        .ws-text { display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+        .ws-text strong { font-size:.8rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ws-text span   { font-size:.7rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+        .ws-pane { display:none; animation:wsFade .22s ease-out; }
+        .ws-pane.is-active { display:block; }
+        @@keyframes wsFade {
+            from { opacity:0; transform:translateY(4px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+
+        .ws-nav {
+            display:flex; align-items:center; gap:10px;
+            padding-top:12px; margin-top:14px;
+            border-top:1px solid var(--border);
+        }
+        .ws-progress { margin-left:auto; margin-right:6px; font-size:.82rem; color:var(--muted); }
+
+        @@media (max-width: 980px) {
+            .ws-stepper { grid-template-columns:repeat(3,1fr); }
+            .ws-step + .ws-step::before { display:none; }
+        }
+        @@media (max-width: 560px) {
+            .ws-stepper { grid-template-columns:repeat(2,1fr); }
+        }
+
+        /* Marketplace platform info card */
+        .mp-platform-info {
+            display:flex; align-items:center; gap:12px;
+            padding:12px 14px; margin-bottom:14px;
+            border-radius:10px;
+            background:rgba(107,156,248,.06);
+            border:1px solid rgba(107,156,248,.25);
+        }
+        .mp-platform-info.is-tr  { background:rgba(255,108,0,.06);  border-color:rgba(255,108,0,.3); }
+        .mp-platform-info.is-hb  { background:rgba(255,96,0,.06);   border-color:rgba(255,96,0,.3); }
+        .mp-platform-info.is-n11 { background:rgba(232,67,67,.06);  border-color:rgba(232,67,67,.3); }
+        .mp-platform-info.is-pz  { background:rgba(255,152,0,.06);  border-color:rgba(255,152,0,.3); }
+        .mp-platform-info.is-cs  { background:rgba(225,86,134,.06); border-color:rgba(225,86,134,.3); }
+        .mp-platform-info.is-ptt { background:rgba(255,205,0,.08);  border-color:rgba(255,205,0,.35); }
+        .mp-platform-info.is-mod { background:rgba(155,90,170,.06); border-color:rgba(155,90,170,.3); }
+        .mp-pi-icon {
+            width:38px; height:38px; flex-shrink:0;
+            border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            color:#fff; font-weight:800; font-size:1rem;
+            background:#6b9cf8;
+        }
+        .mp-platform-info.is-tr  .mp-pi-icon { background:#ff6c00; }
+        .mp-platform-info.is-hb  .mp-pi-icon { background:#ff6000; }
+        .mp-platform-info.is-n11 .mp-pi-icon { background:#e84343; }
+        .mp-platform-info.is-pz  .mp-pi-icon { background:#ff9800; }
+        .mp-platform-info.is-cs  .mp-pi-icon { background:#e15686; }
+        .mp-platform-info.is-ptt .mp-pi-icon { background:#ffcd00; color:#1a1a1a; }
+        .mp-platform-info.is-mod .mp-pi-icon { background:#9b5aaa; }
+        .mp-pi-text { display:flex; flex-direction:column; line-height:1.3; }
+        .mp-pi-text strong { font-size:.92rem; color:var(--text); }
+        .mp-pi-text span { font-size:.8rem; color:var(--muted); }
+
+        label[data-mp-field].is-hidden { display:none !important; }
+        label[data-mp-field] .field-hint:empty { display:none; }
+
+        /* ── Multi-select kart sistemi (Pazaryeri / Kargo) ───────────── */
+        .multi-grid {
+            display:grid; gap:12px;
+            grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+            margin-top:8px;
+        }
+        .multi-card {
+            border:1px solid var(--border);
+            border-radius:12px;
+            background:var(--surface, rgba(255,255,255,.02));
+            overflow:hidden;
+            transition:border-color .18s, box-shadow .18s, transform .18s;
+            position:relative;
+        }
+        .multi-card:hover { border-color:rgba(107,156,248,.45); }
+        .multi-card.is-on {
+            border-color:rgba(39,174,96,.55);
+            box-shadow:0 0 0 1px rgba(39,174,96,.25), 0 6px 20px -10px rgba(39,174,96,.45);
+        }
+        .multi-card-head {
+            display:flex; align-items:center; gap:10px;
+            padding:12px 14px; cursor:pointer;
+            user-select:none;
+        }
+        .multi-card-toggle { width:18px; height:18px; flex-shrink:0; cursor:pointer; accent-color:#27ae60; }
+        .multi-logo {
+            width:42px; height:42px; flex-shrink:0;
+            border-radius:10px;
+            display:flex; align-items:center; justify-content:center;
+            color:#fff; font-weight:800; font-size:.85rem; letter-spacing:.5px;
+            background:#6b9cf8;
+        }
+        .multi-title { display:flex; flex-direction:column; line-height:1.25; min-width:0; flex:1; }
+        .multi-title strong { font-size:.92rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .multi-title span   { font-size:.76rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .multi-tick {
+            width:24px; height:24px; flex-shrink:0; border-radius:50%;
+            background:rgba(125,141,184,.15); color:transparent;
+            display:flex; align-items:center; justify-content:center;
+            font-weight:800; font-size:.85rem;
+            transition:background .18s, color .18s, transform .18s;
+        }
+        .multi-card.is-on .multi-tick {
+            background:#27ae60; color:#fff; transform:scale(1.05);
+        }
+        .multi-card-body {
+            display:none;
+            padding:0 14px 14px 14px;
+            border-top:1px dashed var(--border);
+            margin-top:0;
+        }
+        .multi-card.is-open .multi-card-body { display:block; padding-top:12px; }
+
+        /* Brand colors — Marketplace */
+        .multi-card.is-tr  .multi-logo { background:#ff6c00; }
+        .multi-card.is-hb  .multi-logo { background:#ff6000; }
+        .multi-card.is-n11 .multi-logo { background:#e84343; }
+        .multi-card.is-pz  .multi-logo { background:#ff9800; }
+        .multi-card.is-cs  .multi-logo { background:#e15686; }
+        .multi-card.is-ptt .multi-logo { background:#ffcd00; color:#1a1a1a; }
+        .multi-card.is-mod .multi-logo { background:#9b5aaa; }
+        .multi-card.is-amz .multi-logo { background:#ff9900; color:#1a1a1a; }
+        .multi-card.is-tr.is-on  { border-color:rgba(255,108,0,.55); box-shadow:0 0 0 1px rgba(255,108,0,.25), 0 6px 20px -10px rgba(255,108,0,.45); }
+        .multi-card.is-hb.is-on  { border-color:rgba(255,96,0,.55); }
+        .multi-card.is-n11.is-on { border-color:rgba(232,67,67,.55); }
+        .multi-card.is-pz.is-on  { border-color:rgba(255,152,0,.55); }
+        .multi-card.is-cs.is-on  { border-color:rgba(225,86,134,.55); }
+        .multi-card.is-ptt.is-on { border-color:rgba(255,205,0,.65); }
+        .multi-card.is-mod.is-on { border-color:rgba(155,90,170,.55); }
+        .multi-card.is-amz.is-on { border-color:rgba(255,153,0,.55); }
+
+        /* Brand colors — E-Ticaret platformlari */
+        .multi-card.is-shp .multi-logo { background:#95bf47; }  /* Shopify yesil */
+        .multi-card.is-woo .multi-logo { background:#7f54b3; }  /* WooCommerce mor */
+        .multi-card.is-ids .multi-logo { background:#3a87f9; }  /* IdeaSoft mavi */
+        .multi-card.is-tcx .multi-logo { background:#2f4f8f; }  /* Ticimax lacivert */
+        .multi-card.is-nop .multi-logo { background:#4b8df8; }  /* NopCommerce mavi */
+        .multi-card.is-shp.is-on { border-color:rgba(149,191,71,.55); box-shadow:0 0 0 1px rgba(149,191,71,.25), 0 6px 20px -10px rgba(149,191,71,.45); }
+        .multi-card.is-woo.is-on { border-color:rgba(127,84,179,.55); box-shadow:0 0 0 1px rgba(127,84,179,.25), 0 6px 20px -10px rgba(127,84,179,.45); }
+        .multi-card.is-ids.is-on { border-color:rgba(58,135,249,.55); }
+        .multi-card.is-tcx.is-on { border-color:rgba(47,79,143,.55); }
+        .multi-card.is-nop.is-on { border-color:rgba(75,141,248,.55); }
+
+        /* Brand colors — Kargo provider */
+        .multi-card.brand-ar  .multi-logo { background:#003d7a; }
+        .multi-card.brand-mng .multi-logo { background:#e30613; }
+        .multi-card.brand-sr  .multi-logo { background:#0a8f4e; }
+        .multi-card.brand-yk  .multi-logo { background:#ed1c24; }
+        .multi-card.brand-ups .multi-logo { background:#5b3a1d; color:#ffb500; }
+        .multi-card.brand-ptt .multi-logo { background:#ffcd00; color:#1a1a1a; }
+        .multi-card.brand-hj  .multi-logo { background:#ff6000; }
+        .multi-card.brand-tex .multi-logo { background:#ff6c00; }
+        .multi-card.brand-def .multi-logo { background:#7d8db8; }
+
+        /* Legacy details collapse */
+        .legacy-mp-details {
+            border:1px dashed var(--border); border-radius:10px;
+            padding:10px 14px; background:rgba(125,141,184,.04);
+        }
+        .legacy-mp-details > summary {
+            cursor:pointer; font-size:.85rem; color:var(--muted); font-weight:600;
+        }
+
+        @@media (max-width: 560px) {
+            .multi-grid { grid-template-columns:1fr; }
+        }
+    </style>
+    <script>
+    (function () {
+        var TOTAL = 7;
+        var current = 1;
+        var steps = document.querySelectorAll('#wsStepper .ws-step');
+        var panes = document.querySelectorAll('.ws-pane');
+        var btnBack = document.getElementById('wsBack');
+        var btnNext = document.getElementById('wsNext');
+        var btnSave = document.getElementById('wsSave');
+        var prog    = document.getElementById('wsProgress');
+
+        function render() {
+            steps.forEach(function (s) {
+                var n = parseInt(s.getAttribute('data-step'),10);
+                s.classList.remove('is-active','is-done');
+                if (n < current) s.classList.add('is-done');
+                else if (n === current) s.classList.add('is-active');
+            });
+            panes.forEach(function (p) {
+                p.classList.toggle('is-active', parseInt(p.getAttribute('data-pane'),10) === current);
+            });
+            btnBack.disabled = (current === 1);
+            if (current === TOTAL) {
+                btnNext.style.display = 'none';
+                btnSave.style.display = '';
+            } else {
+                btnNext.style.display = '';
+                btnSave.style.display = 'none';
+            }
+            prog.textContent = 'Adım ' + current + ' / ' + TOTAL;
+        }
+
+        function validateStep(n) {
+            var pane = document.querySelector('.ws-pane[data-pane="' + n + '"]');
+            if (!pane) return true;
+            var inputs = pane.querySelectorAll('input, textarea, select');
+            for (var i = 0; i < inputs.length; i++) {
+                if (!inputs[i].checkValidity()) {
+                    inputs[i].reportValidity();
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        btnNext.addEventListener('click', function () {
+            if (!validateStep(current)) return;
+            if (current < TOTAL) { current++; render(); }
+        });
+        btnBack.addEventListener('click', function () {
+            if (current > 1) { current--; render(); }
+        });
+        steps.forEach(function (s) {
+            s.addEventListener('click', function () {
+                var target = parseInt(s.getAttribute('data-step'),10);
+                if (target <= current) { current = target; render(); return; }
+                for (var k = current; k < target; k++) {
+                    if (!validateStep(k)) return;
+                }
+                current = target; render();
+            });
+        });
+        render();
+    }());
+
+    // ── Multi-select kart toggle (E-Ticaret / Pazaryeri / Kargo) ─
+    (function () {
+        function counterIdFor(kind) {
+            if (kind === 'mp') return 'mpSelectedCount';
+            if (kind === 'cg') return 'cgSelectedCount';
+            if (kind === 'ec') return 'ecSelectedCount';
+            return null;
+        }
+        function refreshCounter(kind) {
+            var sel = '.multi-card[data-multi="' + kind + '"] .multi-card-toggle:checked';
+            var n = document.querySelectorAll(sel).length;
+            var id = counterIdFor(kind);
+            if (!id) return;
+            var target = document.getElementById(id);
+            if (target) target.textContent = String(n);
+        }
+        function bindCard(card) {
+            var cb = card.querySelector('.multi-card-toggle');
+            if (!cb) return;
+
+            // Sadece BU kart'in checkbox change event'i dinleniyor — komsu kartlara
+            // event sizdirmamak icin stopPropagation. Native <label> wrapping zaten
+            // checkbox toggle'ini bu kartla sinirli tutar; ek click handler yok.
+            cb.addEventListener('change', function (e) {
+                e.stopPropagation();
+                if (cb.checked) {
+                    card.classList.add('is-on');
+                    card.classList.add('is-open');
+                } else {
+                    card.classList.remove('is-on');
+                    card.classList.remove('is-open');
+                }
+                refreshCounter(card.getAttribute('data-multi'));
+            });
+
+            // Body icindeki input/select tikla olaylari kart toggle'ina sizmasin —
+            // kullanici credential alanlarina tikladiginda checkbox'in degismemesini garanti eder.
+            var body = card.querySelector('.multi-card-body');
+            if (body) {
+                body.addEventListener('click', function (e) { e.stopPropagation(); });
+            }
+        }
+        document.querySelectorAll('.multi-card').forEach(bindCard);
+        refreshCounter('mp');
+        refreshCounter('cg');
+        refreshCounter('ec');
+    }());
+
+    // ── Marketplace platform-aware input labels ─────────────────
+    (function () {
+        var sel = document.getElementById('mpPlatform');
+        if (!sel) return;
+
+        var SCHEMA = {
+            'Trendyol': {
+                cls: 'is-tr', icon: 'TY',
+                title: 'Trendyol Seller Center',
+                hint: 'Supplier ID + API Key/Secret gerekir. Seller Panel > Entegrasyon Bilgileri.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',    placeholder:'https://api.trendyol.com', hint:'Varsayılan: api.trendyol.com — değiştirmenize gerek yok.' },
+                    apiKey:    { label:'API Key',       placeholder:'Trendyol API Key',          hint:'Seller Panel > Hesap Bilgileri > Entegrasyon Bilgileri.' },
+                    apiSecret: { label:'API Secret',    placeholder:'Trendyol API Secret',       hint:'API Key ile birlikte verilir.' },
+                    storeId:   { label:'Supplier ID',   placeholder:'Örn: 123456',               hint:'Trendyol satıcı (supplier) numerik ID.' },
+                    channelCode: { show:true }
+                }
+            },
+            'Hepsiburada': {
+                cls: 'is-hb', icon: 'HB',
+                title: 'Hepsiburada Marketplace',
+                hint: 'Merchant ID + Username/Password gerekir. Satıcı Paneli > Entegrasyonlar.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',          placeholder:'https://oms-external.hepsiburada.com', hint:'Production: oms-external.hepsiburada.com' },
+                    apiKey:    { label:'Kullanıcı Adı',       placeholder:'Hepsiburada API kullanıcı adı',         hint:'Satıcı paneli üzerinden oluşturulan API kullanıcısı.' },
+                    apiSecret: { label:'Şifre',               placeholder:'Hepsiburada API şifresi',                hint:'Basic Auth için kullanılır.' },
+                    storeId:   { label:'Merchant ID',         placeholder:'Hepsiburada satıcı ID',                  hint:'Satıcı Paneli > Entegrasyonlar > Merchant ID.' },
+                    channelCode: { show:false }
+                }
+            },
+            'N11': {
+                cls: 'is-n11', icon: 'N11',
+                title: 'N11 Marketplace (SOAP)',
+                hint: 'Sadece API Key + API Secret yeterli. SOAP servisi kullanılır.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',  placeholder:'https://api.n11.com',  hint:'N11 SOAP servis kök adresi. Varsayılan yeterlidir.' },
+                    apiKey:    { label:'API Key',     placeholder:'N11 satıcı paneli',     hint:'Satıcı paneli > Hesabım > Entegrasyon Bilgileri.' },
+                    apiSecret: { label:'API Secret',  placeholder:'N11 satıcı paneli',     hint:'API Key ile birlikte verilir.' },
+                    storeId:   { show:false },
+                    channelCode: { show:false }
+                }
+            },
+            'Pazarama': {
+                cls: 'is-pz', icon: 'PZ',
+                title: 'Pazarama Marketplace',
+                hint: 'Client ID + Client Secret gerekir. İş Ortağım paneli üzerinden alınır.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',    placeholder:'https://isortagimapi.pazarama.com', hint:'Varsayılan: isortagimapi.pazarama.com — değiştirmenize gerek yok.' },
+                    apiKey:    { label:'Client ID',     placeholder:'Pazarama Client ID',                hint:'İş Ortağım paneli > API Bilgileri.' },
+                    apiSecret: { label:'Client Secret', placeholder:'Pazarama Client Secret',            hint:'Client ID ile birlikte verilir.' },
+                    storeId:   { show:false },
+                    channelCode: { show:false }
+                }
+            },
+            'CicekSepeti': {
+                cls: 'is-cs', icon: 'ÇS',
+                title: 'Çiçek Sepeti Marketplace',
+                hint: 'API Key + Bayi Kodu (DealerCode) gerekir. satici@ciceksepeti.com\'dan talep edilir.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',  placeholder:'https://apis.ciceksepeti.com', hint:'Varsayılan: apis.ciceksepeti.com — değiştirmenize gerek yok.' },
+                    apiKey:    { label:'API Key',     placeholder:'Çiçek Sepeti API Key',          hint:'satici@ciceksepeti.com adresinden talep edilir.' },
+                    apiSecret: { show:false },
+                    storeId:   { label:'Bayi Kodu',   placeholder:'Çiçek Sepeti bayi/satıcı kodu', hint:'CS satıcı paneli > Bayi Kodu.' },
+                    channelCode: { show:false }
+                }
+            },
+            'PttAvm': {
+                cls: 'is-ptt', icon: 'PTT',
+                title: 'PttAVM Marketplace',
+                hint: 'API Key + Satıcı Kodu gerekir. PTT satıcı paneli > Entegrasyon bölümünden alınır.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',  placeholder:'https://ptt-pubsubapi.pttavm.com', hint:'Varsayılan: ptt-pubsubapi.pttavm.com — değiştirmenize gerek yok.' },
+                    apiKey:    { label:'API Key',     placeholder:'PttAVM API Key',                    hint:'Satıcı paneli > Entegrasyon > API Bilgileri.' },
+                    apiSecret: { show:false },
+                    storeId:   { label:'Satıcı Kodu', placeholder:'PTT tarafından atanan satıcı kodu', hint:'PttAVM satıcı paneli > Hesap Bilgileri.' },
+                    channelCode: { show:false }
+                }
+            },
+            'Modanisa': {
+                cls: 'is-mod', icon: 'MD',
+                title: 'Modanisa Marketplace',
+                hint: 'API Key + API Secret + Satıcı ID gerekir. Anlaşmalı satıcılara açıktır.',
+                fields: {
+                    apiUrl:    { label:'API Adresi',  placeholder:'https://api.modanisa.com', hint:'Varsayılan: api.modanisa.com — değiştirmenize gerek yok.' },
+                    apiKey:    { label:'API Key',     placeholder:'Modanisa API Key',          hint:'Modanisa satıcı paneli > Entegrasyon.' },
+                    apiSecret: { label:'API Secret',  placeholder:'Modanisa API Secret',       hint:'API Key ile birlikte verilir.' },
+                    storeId:   { label:'Satıcı ID',   placeholder:'Modanisa numerik satıcı ID', hint:'Modanisa satıcı paneli > Hesap Bilgileri.' },
+                    channelCode: { show:false }
+                }
+            }
+        };
+
+        var info  = document.getElementById('mpPlatformInfo');
+        var icon  = document.getElementById('mpPiIcon');
+        var title = document.getElementById('mpPiTitle');
+        var hint  = document.getElementById('mpPiHint');
+
+        function applySchema(platform) {
+            var schema = SCHEMA[platform];
+            // Tüm field'ları varsayılana çevir
+            document.querySelectorAll('label[data-mp-field]').forEach(function (lbl) {
+                lbl.classList.remove('is-hidden');
+            });
+
+            if (!schema) {
+                info.style.display = 'none';
+                info.className = 'mp-platform-info';
+                document.querySelectorAll('[data-mp-hint]').forEach(function (h) { h.textContent = ''; });
+                return;
+            }
+
+            // Banner
+            info.style.display = '';
+            info.className = 'mp-platform-info ' + schema.cls;
+            icon.textContent = schema.icon;
+            title.textContent = schema.title;
+            hint.textContent = schema.hint;
+
+            // Her field için label / placeholder / hint güncelle veya gizle
+            Object.keys(schema.fields).forEach(function (key) {
+                var cfg = schema.fields[key];
+                var lbl = document.querySelector('label[data-mp-field="' + key + '"]');
+                if (!lbl) return;
+                if (cfg.show === false) { lbl.classList.add('is-hidden'); return; }
+                var labelEl = lbl.querySelector('[data-mp-label="' + key + '"]');
+                var inputEl = lbl.querySelector('[data-mp-input="' + key + '"]');
+                var hintEl  = lbl.querySelector('[data-mp-hint="' + key + '"]');
+                if (labelEl && cfg.label) labelEl.textContent = cfg.label;
+                if (inputEl && cfg.placeholder) inputEl.setAttribute('placeholder', cfg.placeholder);
+                if (hintEl) hintEl.textContent = cfg.hint || '';
+            });
+        }
+
+        sel.addEventListener('change', function () { applySchema(sel.value); });
+        applySchema(sel.value); // İlk yüklemede uygula
+    }());
+    </script>
+}
+

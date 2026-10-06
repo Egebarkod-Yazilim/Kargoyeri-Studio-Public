@@ -1,0 +1,99 @@
+﻿@model PickupCreateViewModel
+@{
+    ViewData["Title"] = "Yeni Kurye Randevusu";
+}
+
+<section class="panel-card">
+    <p class="eyebrow">@Model.TenantName</p>
+    <h2 style="margin:4px 0 18px;">Yeni Kurye Randevusu</h2>
+
+    <form asp-action="Create" method="post" class="form-grid" style="max-width:720px;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="TenantKey" />
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <label>
+                <span>Kargo Firmasi <span style="color:#dc2626;">*</span></span>
+                <select asp-for="ProviderType" class="form-input" required>
+                    <option value="">â€” Seciniz â€”</option>
+                    @foreach (var p in Model.AvailableProviders)
+                    {
+                        <option value="@p">@p</option>
+                    }
+                </select>
+                <span asp-validation-for="ProviderType" class="field-error"></span>
+            </label>
+
+            <label>
+                <span>Alim Tarihi <span style="color:#dc2626;">*</span></span>
+                <input asp-for="PickupDate" type="date" class="form-input" required />
+                <span asp-validation-for="PickupDate" class="field-error"></span>
+            </label>
+        </div>
+
+        <label>
+            <span>Saat Araligi</span>
+            <input asp-for="TimeWindow" class="form-input" placeholder="09:00-18:00" />
+            <span asp-validation-for="TimeWindow" class="field-error"></span>
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <label>
+                <span>Iletisim Kisisi <span style="color:#dc2626;">*</span></span>
+                <input asp-for="ContactName" class="form-input" required />
+                <span asp-validation-for="ContactName" class="field-error"></span>
+            </label>
+            <label>
+                <span>Telefon <span style="color:#dc2626;">*</span></span>
+                <input asp-for="ContactPhone" class="form-input" placeholder="0532 ..." required />
+                <span asp-validation-for="ContactPhone" class="field-error"></span>
+            </label>
+        </div>
+
+        <label>
+            <span>Adres <span style="color:#dc2626;">*</span></span>
+            <textarea asp-for="AddressLine" class="form-input" rows="2" required></textarea>
+            <span asp-validation-for="AddressLine" class="field-error"></span>
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <label>
+                <span>Il <span style="color:#dc2626;">*</span></span>
+                <input asp-for="City" class="form-input" required />
+                <span asp-validation-for="City" class="field-error"></span>
+            </label>
+            <label>
+                <span>Ilce <span style="color:#dc2626;">*</span></span>
+                <input asp-for="District" class="form-input" required />
+                <span asp-validation-for="District" class="field-error"></span>
+            </label>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <label>
+                <span>Koli Sayisi <span style="color:#dc2626;">*</span></span>
+                <input asp-for="ParcelCount" type="number" min="1" class="form-input" required />
+                <span asp-validation-for="ParcelCount" class="field-error"></span>
+            </label>
+            <label>
+                <span>@L["Label_Weight"] (kg)</span>
+                <input asp-for="TotalWeightKg" type="number" step="0.01" min="0" class="form-input" />
+                <span asp-validation-for="TotalWeightKg" class="field-error"></span>
+            </label>
+        </div>
+
+        <label>
+            <span>Notlar (asansor durumu, yukleme platformu vs.)</span>
+            <textarea asp-for="Notes" class="form-input" rows="3"></textarea>
+        </label>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+            <a asp-action="Index" asp-route-tenantKey="@Model.TenantKey" class="secondary-button">İptal</a>
+            <button type="submit" class="primary-button">@L["Action_Create"]</button>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

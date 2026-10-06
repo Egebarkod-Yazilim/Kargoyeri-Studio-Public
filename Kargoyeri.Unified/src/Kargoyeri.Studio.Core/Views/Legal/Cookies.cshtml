@@ -1,0 +1,49 @@
+@{
+    ViewData["Title"] = "Cerez Politikasi";
+    Layout = "_LegalLayout";
+}
+
+<h1>Cerez Politikasi</h1>
+<p class="lead">Son guncelleme: @DateTime.UtcNow.ToString("dd.MM.yyyy")</p>
+
+<h2>1. Cerez Nedir?</h2>
+<p>
+    Cerezler, ziyaret ettiginiz web sitesinin tarayiciniza yerlestirdigi kucuk metin dosyalaridir.
+    Bu sitede yalnizca <strong>islevsel ve guvenlik amacli</strong> cerezler kullanilir;
+    pazarlama / reklam izleme cerezi yoktur.
+</p>
+
+<h2>2. Kullandigimiz Cerezler</h2>
+<table style="width:100%; border-collapse:collapse; margin-top:8px;">
+    <thead>
+        <tr style="background:#f1f5f9;">
+            <th style="text-align:left; padding:8px; border:1px solid #e2e8f0;">Ad</th>
+            <th style="text-align:left; padding:8px; border:1px solid #e2e8f0;">Amac</th>
+            <th style="text-align:left; padding:8px; border:1px solid #e2e8f0;">Sure</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="padding:8px; border:1px solid #e2e8f0;"><code>kargoyeri-studio-auth</code></td>
+            <td style="padding:8px; border:1px solid #e2e8f0;">Oturum yonetimi (login durumu)</td>
+            <td style="padding:8px; border:1px solid #e2e8f0;">8 saat (kayan)</td>
+        </tr>
+        <tr>
+            <td style="padding:8px; border:1px solid #e2e8f0;"><code>.AspNetCore.Antiforgery.*</code></td>
+            <td style="padding:8px; border:1px solid #e2e8f0;">CSRF korumasi</td>
+            <td style="padding:8px; border:1px solid #e2e8f0;">Oturum sonu</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>3. Cerezleri Yonetme</h2>
+<p>
+    Cerezleri tarayici ayarlarinizdan silebilir veya engelleyebilirsiniz; ancak bu durumda
+    sisteme giris yapamayabilirsiniz.
+</p>
+
+<h2>4. Ucuncu Taraf Cerezleri</h2>
+<p>
+    Sistemde 3. taraf takip cerezi <strong>kullanilmamaktadir</strong>.
+    Google Analytics, Facebook Pixel veya benzeri reklam izleyiciler entegre edilmemistir.
+</p>

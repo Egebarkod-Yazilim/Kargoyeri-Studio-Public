@@ -1,0 +1,175 @@
+﻿@model PickupIndexViewModel
+@using Kargoyeri.Studio.Core.Infrastructure
+@{
+    ViewData["Title"] = "Kurye Randevulari";
+    string PillClass(string status) => status switch
+    {
+        PickupStatus.Draft     => "status-pill--pending",
+        PickupStatus.Requested => "status-pill--live",
+        PickupStatus.Confirmed => "status-pill--ready",
+        PickupStatus.Completed => "status-pill--ready",
+        PickupStatus.Cancelled => "status-pill--error",
+        _                       => "status-pill--pending"
+    };
+    string Translate(string status) => status switch
+    {
+        PickupStatus.Draft     => "Taslak",
+        PickupStatus.Requested => "Iletildi",
+        PickupStatus.Confirmed => "Konfirme",
+        PickupStatus.Completed => "Tamamlandi",
+        PickupStatus.Cancelled => L["Status_Cancelled"].Value,
+        _                       => status
+    };
+}
+
+<section class="panel-card" style="margin-bottom:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+            <p class="eyebrow">Aktif musteri</p>
+            <h2 style="margin:4px 0;">@Model.TenantName</h2>
+            <p class="provider-index-note" style="margin:0;">
+                Operasyon ekibi kurye cagrisi olusturur, durumu izler. Kargo firmasiyla telefon/portal uzerinden
+                yapilan goruslerin kayit altinda tutulmasi icin kullanilir.
+            </p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            @if (Model.IsAdmin && Model.Tenants.Count > 1)
+            {
+                <form method="get" asp-action="Index" style="margin:0;">
+                    <select name="tenantKey" onchange="this.form.submit()" class="form-input" style="min-width:220px;">
+                        @foreach (var t in Model.Tenants)
+                        {
+                            <option value="@t.TenantKey" selected="@(t.TenantKey == Model.TenantKey)">@t.Name</option>
+                        }
+                    </select>
+                </form>
+            }
+            <a class="primary-button" asp-action="Create" asp-route-tenantKey="@Model.TenantKey">+ Yeni Randevu</a>
+        </div>
+    </div>
+</section>
+
+<section class="panel-card">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <a class="secondary-button @(string.IsNullOrEmpty(Model.StatusFilter) ? "is-active" : "")"
+           asp-action="Index" asp-route-tenantKey="@Model.TenantKey">Tumu (@Model.Items.Count)</a>
+        @foreach (var s in PickupStatus.All)
+        {
+            var count = Model.Items.Count(i => i.Status == s);
+            <a class="secondary-button @(Model.StatusFilter == s ? "is-active" : "")"
+               asp-action="Index" asp-route-tenantKey="@Model.TenantKey" asp-route-status="@s">@Translate(s) (@count)</a>
+        }
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <p style="text-align:center;color:var(--muted);padding:24px;">
+            Bu kriterde randevu bulunamadi.
+        </p>
+    }
+    else
+    {
+        <table class="studio-table" style="font-size:.84rem;">
+            <thead>
+                <tr>
+                    <th>@L["Label_Date"]</th>
+                    <th>Kargo</th>
+                    <th>Iletisim</th>
+                    <th>Adres</th>
+                    <th style="text-align:center;">Koli</th>
+                    <th style="text-align:center;">@L["Label_Status"]</th>
+                    <th style="text-align:right;">Islem</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <strong>@p.PickupDate</strong><br />
+                            <span style="color:var(--muted);font-size:.78rem;">@p.TimeWindow</span>
+                        </td>
+                        <td><span class="status-pill">@p.ProviderType</span></td>
+                        <td>
+                            @p.ContactName<br />
+                            <span style="color:var(--muted);font-size:.78rem;font-family:monospace;">@p.ContactPhone</span>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--muted);max-width:240px;">
+                            @p.AddressLine, @p.District / @p.City
+                        </td>
+                        <td style="text-align:center;">
+                            <strong>@p.ParcelCount</strong>
+                            @if (p.TotalWeightKg.HasValue)
+                            {
+                                <br /><span style="color:var(--muted);font-size:.72rem;">@p.TotalWeightKg.Value.ToString("0.##") kg</span>
+                            }
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="status-pill @PillClass(p.Status)">@Translate(p.Status)</span>
+                            @if (!string.IsNullOrWhiteSpace(p.ConfirmationCode))
+                            {
+                                <br />
+                                <span style="font-family:monospace;font-size:.72rem;color:var(--muted);">@p.ConfirmationCode</span>
+                            }
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;">
+                                @if (p.Status == PickupStatus.Draft)
+                                {
+                                    <form asp-action="MarkRequested" method="post" style="display:inline;margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@Model.TenantKey" />
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <input type="text" name="confirmationCode" placeholder="Konfirme kodu (ops)" class="form-input" style="width:120px;font-size:.72rem;padding:4px 6px;" />
+                                        <button class="secondary-button" type="submit" style="font-size:.72rem;padding:4px 8px;">Iletildi</button>
+                                    </form>
+                                    <form asp-action="DeleteDraft" method="post" style="display:inline;margin:0;"
+                                          onsubmit="return confirm('Taslagi silmek istediginize emin misiniz?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@Model.TenantKey" />
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <button class="secondary-button" type="submit"
+                                                style="font-size:.72rem;padding:4px 8px;color:#dc2626;border-color:#dc2626;">Sil</button>
+                                    </form>
+                                }
+                                @if (p.Status == PickupStatus.Requested)
+                                {
+                                    <form asp-action="MarkConfirmed" method="post" style="display:inline;margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@Model.TenantKey" />
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <button class="secondary-button" type="submit" style="font-size:.72rem;padding:4px 8px;">Konfirme</button>
+                                    </form>
+                                }
+                                @if (p.Status == PickupStatus.Confirmed || p.Status == PickupStatus.Requested)
+                                {
+                                    <form asp-action="MarkCompleted" method="post" style="display:inline;margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@Model.TenantKey" />
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <button class="secondary-button" type="submit" style="font-size:.72rem;padding:4px 8px;">Tamamlandi</button>
+                                    </form>
+                                }
+                                @if (!PickupStatus.IsTerminal(p.Status))
+                                {
+                                    <form asp-action="Cancel" method="post" style="display:inline;margin:0;"
+                                          onsubmit="return confirm('Randevuyu iptal etmek istediginize emin misiniz?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tenantKey" value="@Model.TenantKey" />
+                                        <input type="hidden" name="id" value="@p.Id" />
+                                        <button class="secondary-button" type="submit"
+                                                style="font-size:.72rem;padding:4px 8px;color:#dc2626;border-color:#dc2626;">İptal</button>
+                                    </form>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(p.Notes))
+                            {
+                                <div style="font-size:.72rem;color:var(--muted);margin-top:4px;text-align:right;max-width:280px;">@p.Notes</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>

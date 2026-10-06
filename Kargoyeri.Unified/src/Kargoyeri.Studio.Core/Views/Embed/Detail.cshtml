@@ -1,0 +1,57 @@
+﻿@model Kargoyeri.Studio.Core.Models.PublicTrackingResultViewModel
+@{
+    ViewData["Title"] = $"Takip {Model.TrackingNumber}";
+    int progressPct = (Model.Status ?? Kargoyeri.Contracts.Enums.ShipmentStatusDto.Pending) switch
+    {
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Pending           => 10,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Queued            => 15,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.LabelReady        => 30,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.ProviderAccepted  => 45,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.InTransit         => 70,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Delivered         => 100,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Cancelled         => 0,
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Failed            => 0,
+        _ => 5
+    };
+    string statusClass = (Model.Status ?? Kargoyeri.Contracts.Enums.ShipmentStatusDto.Pending) switch
+    {
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Delivered => "success",
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Cancelled => "danger",
+        Kargoyeri.Contracts.Enums.ShipmentStatusDto.Failed    => "danger",
+        _ => string.Empty
+    };
+}
+
+@if (!Model.Found)
+{
+    <div class="embed-empty">
+        <div style="font-size:32px;margin-bottom:8px;">&#128269;</div>
+        <strong>@Model.TrackingNumber</strong>
+        <div style="margin-top:6px;">@Model.Message</div>
+        <a href="@Url.Action("Form", "Embed")" style="display:inline-block;margin-top:12px;color:var(--accent);text-decoration:none;font-weight:600;">Yeniden ara &rarr;</a>
+    </div>
+}
+else
+{
+    <div>
+        <span class="embed-status @statusClass">@Model.StatusText</span>
+        <div style="margin-top:6px;font-size:13px;color:#0f172a;font-family:ui-monospace,monospace;">@Model.TrackingNumber</div>
+
+        <div class="embed-bar"><div class="fill" style="width:@progressPct%;"></div></div>
+
+        <div class="embed-meta">
+            @if (Model.Provider is not null)
+            {
+                <div class="k">@L["Label_Provider"]</div><div class="v">@Model.Provider</div>
+            }
+            @if (Model.CreatedAtUtc is not null)
+            {
+                <div class="k">Olusturma</div><div class="v">@Model.CreatedAtUtc.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+            }
+            @if (Model.LastUpdatedAtUtc is not null)
+            {
+                <div class="k">Son guncelleme</div><div class="v">@Model.LastUpdatedAtUtc.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+            }
+        </div>
+    </div>
+}

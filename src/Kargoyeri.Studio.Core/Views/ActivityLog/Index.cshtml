@@ -1,0 +1,166 @@
+﻿@model ActivityLogViewModel
+@{
+    ViewData["Title"] = "Aktivite Logu";
+}
+
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1 style="margin:0;font-size:1.35rem;">Aktivite Logu</h1>
+    </div>
+    <span style="font-size:.82rem;color:var(--muted);">Son 5000 kayit â€” uygulama yeniden baslatilinca sifirlanir</span>
+</div>
+
+@* â”€â”€ Filtreler â”€â”€ *@
+<div class="panel-card" style="margin-bottom:20px;">
+    <form asp-action="Index" method="get" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:160px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Musteri</label>
+            <select class="form-input" name="tenantKey">
+                <option value="">Tumu</option>
+                @foreach (var tk in Model.AvailableTenants)
+                {
+                    if (Model.TenantKey == tk) { <option value="@tk" selected="selected">@tk</option> }
+                    else { <option value="@tk">@tk</option> }
+                }
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Kullanici</label>
+            <input class="form-input" name="username" value="@Model.Username" placeholder="Kullanici..." />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Controller</label>
+            <select class="form-input" name="controller">
+                <option value="">Tumu</option>
+                @foreach (var c in Model.AvailableControllers)
+                {
+                    if (Model.Controller == c) { <option value="@c" selected="selected">@c</option> }
+                    else { <option value="@c">@c</option> }
+                }
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:110px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">HTTP</label>
+            <select class="form-input" name="httpMethod">
+                <option value="">Tumu</option>
+                @foreach (var m in new[] { "GET", "POST", "PUT", "DELETE" })
+                {
+                    if (Model.HttpMethod == m) { <option value="@m" selected="selected">@m</option> }
+                    else { <option value="@m">@m</option> }
+                }
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Baslangic</label>
+            <input class="form-input" type="date" name="fromDate" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:140px;">
+            <label style="font-size:.76rem;font-weight:600;color:var(--muted);text-transform:uppercase;">Bitis</label>
+            <input class="form-input" type="date" name="toDate" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer;padding-bottom:8px;">
+            @if (Model.ErrorsOnly)
+            {
+                <input type="checkbox" name="errorsOnly" value="true" checked="checked" />
+            }
+            else
+            {
+                <input type="checkbox" name="errorsOnly" value="true" />
+            }
+            <span>Sadece hatalar (4xx/5xx)</span>
+        </label>
+        <div style="display:flex;gap:8px;align-items:center;padding-bottom:2px;">
+            <button type="submit" class="primary-button">Filtrele</button>
+            <a class="ghost-link" asp-action="Index">Temizle</a>
+        </div>
+    </form>
+</div>
+
+@if (!Model.Entries.Any())
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">&#128196;</div>
+        <h2>Henuz aktivite yok</h2>
+        <p>Kullaniciler sayfalar arasinda gezindikce kayitlar burada gorunur.</p>
+    </div>
+}
+else
+{
+    <div class="table-shell">
+        <table class="studio-table">
+            <thead>
+                <tr>
+                    <th>Zaman</th>
+                    <th>Musteri</th>
+                    <th>Kullanici</th>
+                    <th>Rol</th>
+                    <th>Islem</th>
+                    <th>Yol</th>
+                    <th style="text-align:center;">HTTP</th>
+                    <th style="text-align:center;">@L["Label_Status"]</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Entries)
+                {
+                    var isErr = e.StatusCode >= 400;
+                    <tr>
+                        <td style="font-size:.78rem;color:var(--muted);white-space:nowrap;">
+                            @e.OccurredAtUtc.ToLocalTime().ToString("dd.MM.yy HH:mm:ss")
+                        </td>
+                        <td>
+                            <span class="cap-tag" style="font-size:.72rem;">@e.TenantKey</span>
+                        </td>
+                        <td style="font-size:.85rem;font-weight:500;">@e.Username</td>
+                        <td>
+                            @if (e.Role == "Admin")
+                            {
+                                <span class="cap-tag" style="font-size:.7rem;background:rgba(22,163,74,.12);color:#16a34a;">Admin</span>
+                            }
+                            else
+                            {
+                                <span class="cap-tag" style="font-size:.7rem;">Operator</span>
+                            }
+                        </td>
+                        <td style="font-size:.85rem;">
+                            <strong>@e.Controller</strong><span style="color:var(--muted);">/@e.Action</span>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--muted);font-family:monospace;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                            title="@e.Path">@e.Path</td>
+                        <td style="text-align:center;">
+                            <span class="cap-tag" style="font-size:.7rem;">@e.HttpMethod</span>
+                        </td>
+                        <td style="text-align:center;">
+                            <span class="status-pill @(isErr ? "status-pill--pending" : "status-pill--ready")"
+                                  style="font-size:.72rem;">@e.StatusCode</span>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--muted);">@e.IpAddress</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* Sayfalama *@
+    @if (Model.Pagination.TotalPages > 1)
+    {
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:16px;flex-wrap:wrap;">
+            @if (Model.Pagination.HasPrev)
+            {
+                <a class="ghost-link" asp-action="Index" asp-route-tenantKey="@Model.TenantKey"
+                   asp-route-username="@Model.Username" asp-route-page="@(Model.Pagination.Page - 1)">&larr; Onceki</a>
+            }
+            <span style="font-size:.85rem;color:var(--muted);padding:6px 0;">
+                Sayfa @Model.Pagination.Page / @Model.Pagination.TotalPages
+                (@Model.Pagination.TotalCount kayit)
+            </span>
+            @if (Model.Pagination.HasNext)
+            {
+                <a class="ghost-link" asp-action="Index" asp-route-tenantKey="@Model.TenantKey"
+                   asp-route-username="@Model.Username" asp-route-page="@(Model.Pagination.Page + 1)">Sonraki &rarr;</a>
+            }
+        </div>
+    }
+}

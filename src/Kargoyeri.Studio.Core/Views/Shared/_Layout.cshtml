@@ -1,0 +1,218 @@
+@inject Kargoyeri.Studio.Core.Infrastructure.IStudioWorkspaceContext WorkspaceContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Kargoyeri.Studio.Core.Resources.SharedResource> L
+@using Kargoyeri.Studio.Core.Infrastructure
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    string NavClass(string controller) => currentController.Equals(controller, StringComparison.OrdinalIgnoreCase) ? "menu-active" : string.Empty;
+    var isAdmin = User.IsInRole(StudioRoles.Admin);
+    var workspaceName = WorkspaceContext.GetCurrentName() ?? WorkspaceContext.GetCurrentCode();
+    var isImpersonating = isAdmin && WorkspaceContext.IsImpersonating();
+    var impersonateSince = WorkspaceContext.GetImpersonationStartedAt();
+    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    var returnUrl = ViewContext.HttpContext.Request.Path + ViewContext.HttpContext.Request.QueryString;
+    // P3-#7 — Dark mode tercihi cookie'den okunur, html[data-theme] ile uygulanir
+    var theme = ViewContext.HttpContext.Request.Cookies["studio-theme"] ?? "light";
+}
+<!DOCTYPE html>
+<html lang="@currentCulture" data-theme="@theme">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Kargoyeri Studio</title>
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+    <link rel="stylesheet" href="~/_content/Kargoyeri.Studio.Core/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @* P3-#8 — Mobile hamburger toggle (sidebar acma/kapama) *@
+    <button class="mobile-nav-toggle" type="button" aria-label="Menu" data-toggle-sidebar>
+        <span></span><span></span><span></span>
+    </button>
+    <div class="sidebar-backdrop" data-toggle-sidebar></div>
+
+    <div class="page-shell">
+        <aside class="sidebar">
+            <a class="brand" asp-controller="Home" asp-action="Index">
+                <span class="brand-mark">KY</span>
+                <span>
+                    <strong>Kargoyeri Studio</strong>
+                    <small>@L["Brand_Tagline"]</small>
+                </span>
+            </a>
+
+            <nav class="menu">
+                @if (isAdmin)
+                {
+                    <a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">@L["Nav_Dashboard"]</a>
+                    <a class="@NavClass("Workspaces")" asp-controller="Workspaces" asp-action="Index">@L["Nav_Integration"]</a>
+                }
+                else
+                {
+                    <a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">@L["Nav_Dashboard"]</a>
+                }
+                <a class="@NavClass("Providers")" asp-controller="Providers" asp-action="Index">@L["Nav_Providers"]</a>
+                <a class="@NavClass("Shipments")" asp-controller="Shipments" asp-action="Index">@L["Nav_Shipments"]</a>
+                <a class="@NavClass("BulkShipment")" asp-controller="BulkShipment" asp-action="Index">@L["Nav_BulkCsv"]</a>
+                <a class="@NavClass("Pickup")" asp-controller="Pickup" asp-action="Index">@L["Nav_Pickup"]</a>
+                @if (!isAdmin)
+                {
+                    <a class="@NavClass("Reports")" asp-controller="Reports" asp-action="Index">@L["Nav_Reports"]</a>
+                }
+                <a class="@NavClass("Mobile")" asp-controller="Mobile" asp-action="Index">@L["Nav_Mobile"]</a>
+                <a class="@NavClass("Notifications")" asp-controller="Notifications" asp-action="Index">@L["Nav_Notifications"]</a>
+                <a class="@NavClass("WebhookDelivery")" asp-controller="WebhookDelivery" asp-action="Index">@L["Nav_WebhookDelivery"]</a>
+                <a class="@NavClass("ApiKeys")" asp-controller="ApiKeys" asp-action="Index">@L["Nav_ApiKeys"]</a>
+                <a class="@NavClass("AccountData")" asp-controller="AccountData" asp-action="Index">@L["Nav_Account"]</a>
+                @if (isAdmin)
+                {
+                    <a class="@NavClass("OrderChannels")" asp-controller="OrderChannels" asp-action="Index">@L["Nav_OrderChannels"]</a>
+                    @if (string.Equals(ViewContext.RouteData.Values["controller"] as string, "OrderChannels", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var _channelRoute = ViewContext.RouteData.Values["channel"] as string;
+                        <div class="subnav" style="margin:-4px 0 8px 14px;display:flex;flex-direction:column;gap:2px;">
+                            @foreach (var _ch in Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelCatalog.All
+                                        .Where(c => c.Stage != Kargoyeri.Studio.Core.Infrastructure.OrderChannels.OrderChannelStage.ComingSoon))
+                            {
+                                var _isActiveSub = string.Equals(_channelRoute, _ch.Code, StringComparison.OrdinalIgnoreCase);
+                                <a asp-controller="OrderChannels" asp-action="Configure" asp-route-channel="@_ch.Code"
+                                   style="font-size:.78rem;padding:3px 10px;color:@(_isActiveSub ? "var(--accent)" : "var(--muted)");text-decoration:none;">
+                                    &rsaquo; @_ch.DisplayName
+                                </a>
+                            }
+                        </div>
+                    }
+                    <a class="@NavClass("Workflow")" asp-controller="Workflow" asp-action="Index">@L["Nav_Workflow"]</a>
+                    <a class="@NavClass("ProviderHealth")" asp-controller="ProviderHealth" asp-action="Index">@L["Nav_ProviderHealth"]</a>
+                    <a class="@NavClass("TenantSwitch")" asp-controller="TenantSwitch" asp-action="Index">@L["Nav_Customers"]</a>
+                    <a class="@NavClass("Worker")" asp-controller="Worker" asp-action="Index">@L["Nav_Worker"]</a>
+                    <a class="@NavClass("Audit")" asp-controller="Audit" asp-action="Index">@L["Nav_Audit"]</a>
+                    <a class="@NavClass("Billing")" asp-controller="Billing" asp-action="Index">Faturalar</a>
+                }
+            </nav>
+
+            <div class="workspace-chip">
+                <span>@(isAdmin ? L["Session_Admin"] : L["Session_Customer"])</span>
+                <strong>@workspaceName</strong>
+                <div class="culture-switch" style="margin-top:10px;display:flex;gap:6px;align-items:center;font-size:.78rem;opacity:.85;">
+                    <span>@L["Language_Label"]:</span>
+                    <a asp-controller="Culture" asp-action="Set" asp-route-culture="tr" asp-route-returnUrl="@returnUrl"
+                       style="@(currentCulture == "tr" ? "font-weight:700;text-decoration:underline;" : "")">TR</a>
+                    <span style="opacity:.4;">|</span>
+                    <a asp-controller="Culture" asp-action="Set" asp-route-culture="en" asp-route-returnUrl="@returnUrl"
+                       style="@(currentCulture == "en" ? "font-weight:700;text-decoration:underline;" : "")">EN</a>
+                </div>
+
+                @* P3-#7 — Dark mode toggle *@
+                <button type="button" class="theme-toggle" data-theme-toggle
+                        title="Tema degistir" aria-label="Tema degistir">
+                    <span class="theme-icon-light">&#9728;</span>
+                    <span class="theme-icon-dark">&#9789;</span>
+                    <span class="theme-toggle-label">@(theme == "dark" ? "Acik tema" : "Koyu tema")</span>
+                </button>
+
+                @* P3-#6 — Command palette ipucu *@
+                <button type="button" class="cmd-hint" data-open-cmd
+                        title="Hizli arama (Ctrl+K)" aria-label="Hizli arama">
+                    <span>&#128269; Hizli ara</span>
+                    <kbd>Ctrl+K</kbd>
+                </button>
+                <form asp-controller="Access" asp-action="Logout" method="post" style="margin-top:12px;">
+                    @Html.AntiForgeryToken()
+                    <button class="ghost-link" type="submit" style="width:100%;justify-content:center;">@L["Action_Logout"]</button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="content">
+            @if (isImpersonating)
+            {
+                <div class="impersonation-banner">
+                    <span class="impersonation-icon">&#128065;</span>
+                    <div style="flex:1;">
+                        <strong>@L["Impersonation_Banner_Prefix"]</strong>
+                        @string.Format(L["Impersonation_Banner_Body"].Value, workspaceName)
+                        @if (impersonateSince is not null)
+                        {
+                            <span style="opacity:.85;font-size:.78rem;">
+                                &mdash; @string.Format(L["Impersonation_Banner_Since"].Value, impersonateSince.Value.ToLocalTime().ToString("dd.MM HH:mm"))
+                            </span>
+                        }
+                    </div>
+                    <form asp-controller="TenantSwitch" asp-action="StopImpersonation" method="post" style="margin:0;">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="impersonation-stop">@L["Impersonation_Stop"]</button>
+                    </form>
+                </div>
+            }
+            <header class="topbar">
+                <div>
+                    <p class="topbar-label">@L["Topbar_Label"]</p>
+                    <h1>@ViewData["Title"]</h1>
+                </div>
+            </header>
+
+            @* P3-#3 — Toast bildirim. TempData["StudioMessageType"] = success|info|warning|error.
+               TempData["StudioMessage"] hala destekleniyor (geriye donuk uyumluluk). *@
+            @{
+                var toastMessage = TempData["StudioMessage"] as string;
+                var toastType = (TempData["StudioMessageType"] as string ?? "info").ToLowerInvariant();
+            }
+            @if (!string.IsNullOrWhiteSpace(toastMessage))
+            {
+                <div class="toast-container" data-toast-mount>
+                    <div class="toast toast--@toastType" role="status">
+                        <span class="toast-icon">
+                            @switch (toastType)
+                            {
+                                case "success": @:&#10003;
+                                    break;
+                                case "warning": @:&#9888;
+                                    break;
+                                case "error":   @:&#10006;
+                                    break;
+                                default:        @:&#9432;
+                                    break;
+                            }
+                        </span>
+                        <span class="toast-msg">@toastMessage</span>
+                        <button type="button" class="toast-close" aria-label="Kapat">&times;</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="toast-container" data-toast-mount></div>
+            }
+
+            @RenderBody()
+        </main>
+    </div>
+
+    @* P3-#6 — Command palette modal *@
+    <div class="cmd-modal" data-cmd-modal hidden>
+        <div class="cmd-backdrop" data-close-cmd></div>
+        <div class="cmd-panel" role="dialog" aria-label="Hizli arama">
+            <input type="text" class="cmd-input" placeholder="Sayfa, gonderi referansi veya takip no yaz..."
+                   data-cmd-input autocomplete="off" />
+            <div class="cmd-list" data-cmd-list></div>
+            <div class="cmd-foot">
+                <kbd>&uarr;</kbd><kbd>&darr;</kbd> gez &middot; <kbd>Enter</kbd> ac &middot; <kbd>Esc</kbd> kapat
+            </div>
+        </div>
+    </div>
+
+    <script src="~/_content/Kargoyeri.Studio.Core/js/site.js" asp-append-version="true"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/service-worker.js');
+            });
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
